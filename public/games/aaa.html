@@ -2079,6 +2079,112 @@
       }
     }
 
+    /* WW2 SVG unit library integration: varied piece silhouettes on readable stacks. */
+    .pieceMarker.singlePiece .stackChip,
+    .navalMarker.singlePiece .stackChip {
+      position: absolute;
+      left: 8px;
+      top: calc(30px - (var(--i, 0) * 5px));
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 34% 24%, #ffffff, #f8fafc 54%, #e5e7eb 100%);
+      border: 3px solid #94a3b8;
+      box-shadow:
+        inset 0 -3px 0 rgba(15,23,42,.08),
+        0 0 0 1px rgba(15,23,42,.32),
+        0 9px 18px rgba(0,0,0,.34);
+    }
+
+    .pieceMarker.singlePiece .stackChip.five,
+    .navalMarker.singlePiece .stackChip.five {
+      background:
+        radial-gradient(circle at 34% 24%, #fecaca, #dc2626 58%, #7f1d1d 100%);
+      border-color: #ffffff;
+      box-shadow:
+        inset 0 -3px 0 rgba(15,23,42,.18),
+        0 0 0 1px rgba(127,29,29,.58),
+        0 9px 18px rgba(0,0,0,.36);
+    }
+
+    .pieceMarker.singlePiece .unitIcon,
+    .navalMarker.singlePiece .unitIcon {
+      color: var(--piece-colour, #111827);
+      fill: currentColor;
+      transform-origin: center bottom;
+      filter:
+        drop-shadow(0 2px 0 rgba(255,255,255,.82))
+        drop-shadow(0 8px 7px rgba(0,0,0,.72))
+        drop-shadow(0 0 3px rgba(0,0,0,.68)) !important;
+    }
+
+    .pieceMarker.singlePiece .unitStack.infantry .unitIcon {
+      width: 66px !important;
+      height: 44px !important;
+      left: -4px !important;
+      top: 2px !important;
+    }
+
+    .pieceMarker.singlePiece .unitStack.tank .unitIcon {
+      width: 58px !important;
+      height: 42px !important;
+      left: 0 !important;
+      top: 5px !important;
+    }
+
+    .pieceMarker.singlePiece .unitStack.fighter .unitIcon {
+      width: 58px !important;
+      height: 44px !important;
+      left: 0 !important;
+      top: 1px !important;
+    }
+
+    .pieceMarker.singlePiece .unitStack.navy .unitIcon {
+      width: 72px !important;
+      height: 34px !important;
+      left: -7px !important;
+      top: 11px !important;
+    }
+
+    .navalMarker.singlePiece .navalStack.carrier .unitIcon {
+      width: 86px !important;
+      height: 28px !important;
+      left: -14px !important;
+      top: 13px !important;
+    }
+
+    .navalMarker.singlePiece .navalStack.battleship .unitIcon {
+      width: 82px !important;
+      height: 31px !important;
+      left: -12px !important;
+      top: 12px !important;
+    }
+
+    .navalMarker.singlePiece .navalStack.destroyer .unitIcon {
+      width: 72px !important;
+      height: 31px !important;
+      left: -7px !important;
+      top: 12px !important;
+    }
+
+    .navalMarker.singlePiece .navalStack.submarine .unitIcon {
+      width: 74px !important;
+      height: 30px !important;
+      left: -8px !important;
+      top: 14px !important;
+    }
+
+    .pieceMarker.singlePiece .count,
+    .navalMarker.singlePiece .count {
+      background: rgba(255,255,255,.96) !important;
+      border: 3px solid #94a3b8 !important;
+      color: #111827 !important;
+      box-shadow:
+        0 0 0 1px rgba(15,23,42,.32),
+        0 5px 12px rgba(0,0,0,.28) !important;
+    }
+
   </style>
 </head>
 
@@ -2250,6 +2356,8 @@
     let viewMode = "globe";
     let forcePieces = false;
     let countryMarkers = [];
+    const MOBILE_LAND_POWERS = new Set(["USA", "USSR"]);
+    const mobileLandAreas = new Map();
 
     const powerColors = {
       Germany: "#111111",
@@ -2458,10 +2566,33 @@
 
     function syncPhysicalPieceZoomState() {
       const zoom = map.getZoom();
-      const scale = Math.max(0.38, Math.min(1.06, (0.42 + ((zoom - 1) / 7.5) * 0.76) * 0.90));
+      const revealZoom = getPieceRevealZoom();
+      const zoomPastReveal = Math.max(0, zoom - revealZoom);
+      const closeZoomBoost = Math.max(0, zoom - 6.5);
+      const scale = Math.max(
+        0.52,
+        Math.min(2.35, 0.58 + zoomPastReveal * 0.36 + closeZoomBoost * 0.18)
+      );
 
       document.querySelectorAll(".pieceMarker.singlePiece .unitCluster, .navalMarker.singlePiece .navalCluster").forEach((el) => {
         el.style.setProperty("--piece-scale", scale.toFixed(3));
+      });
+    }
+
+    function syncMobileLargeCountryMarkers() {
+      if (!mobileLandAreas.size || !countryMarkers.length) return;
+      const center = map.getCenter();
+      const target = [center.lng, center.lat];
+
+      countryMarkers.forEach((ref) => {
+        if (!MOBILE_LAND_POWERS.has(ref.country.name)) return;
+        const area = mobileLandAreas.get(ref.country.name);
+        const point = constrainedPointInMobileArea(area, target);
+        if (!point) return;
+
+        ref.lon = point[0];
+        ref.lat = point[1];
+        ref.marker.setLngLat(point);
       });
     }
 
@@ -2631,6 +2762,7 @@
       applyViewMode("globe");
       forcePieces = false;
       updatePlacedCount();
+      syncMobileLargeCountryMarkers();
       syncPhysicalPieceZoomState();
       updateUiState();
       statusPill.textContent =
@@ -2647,6 +2779,10 @@
 
       geojson.features.forEach((feature) => {
         decorateFeature(feature);
+        const mobileOwner = mobileLandOwnerForFeature(feature.properties?.name);
+        if (mobileOwner) {
+          mobileLandAreas.set(mobileOwner, buildMobileLandArea(feature));
+        }
       });
 
       map.addSource("countries", {
@@ -2989,6 +3125,222 @@
       return [(minLon + maxLon) / 2, (minLat + maxLat) / 2];
     }
 
+    function mobileLandOwnerForFeature(name) {
+      const participant = participants[name];
+      if (participant && MOBILE_LAND_POWERS.has(participant.name)) return participant.name;
+      if (name === "Russia" || name === "Russian Federation") return "USSR";
+      if (name === "United States" || name === "United States of America") return "USA";
+      return null;
+    }
+
+    function normalizeLng(lng) {
+      let value = lng;
+      while (value > 180) value -= 360;
+      while (value < -180) value += 360;
+      return value;
+    }
+
+    function wrapLngNear(lng, targetLng) {
+      let value = normalizeLng(lng);
+      while (value - targetLng > 180) value -= 360;
+      while (targetLng - value > 180) value += 360;
+      return value;
+    }
+
+    function unwrapRingNear(ring, targetLng) {
+      if (!ring || !ring.length) return [];
+      const unwrapped = [];
+      let previous = wrapLngNear(ring[0][0], targetLng);
+      unwrapped.push([previous, ring[0][1]]);
+
+      for (let i = 1; i < ring.length; i++) {
+        const lng = wrapLngNear(ring[i][0], previous);
+        unwrapped.push([lng, ring[i][1]]);
+        previous = lng;
+      }
+
+      const avgLng = unwrapped.reduce((sum, point) => sum + point[0], 0) / unwrapped.length;
+      const shift = Math.round((targetLng - avgLng) / 360) * 360;
+      return unwrapped.map((point) => [point[0] + shift, point[1]]);
+    }
+
+    function ringCenter(ring) {
+      if (!ring || !ring.length) return [0, 0];
+      let lon = 0;
+      let lat = 0;
+      ring.forEach((point) => {
+        lon += point[0];
+        lat += point[1];
+      });
+      return [lon / ring.length, lat / ring.length];
+    }
+
+    function buildMobileLandArea(feature) {
+      const geometry = feature.geometry || {};
+      const polygonGroups =
+        geometry.type === "Polygon"
+          ? [geometry.coordinates]
+          : geometry.type === "MultiPolygon"
+            ? geometry.coordinates
+            : [];
+
+      return {
+        polygons: polygonGroups
+          .filter((rings) => Array.isArray(rings) && rings[0] && rings[0].length >= 4)
+          .map((rings) => ({
+            outer: rings[0],
+            holes: rings.slice(1),
+            center: ringCenter(rings[0])
+          }))
+      };
+    }
+
+    function pointInRing(point, ring) {
+      const x = point[0];
+      const y = point[1];
+      let inside = false;
+
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0];
+        const yi = ring[i][1];
+        const xj = ring[j][0];
+        const yj = ring[j][1];
+        const intersects = ((yi > y) !== (yj > y)) &&
+          (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-9) + xi);
+        if (intersects) inside = !inside;
+      }
+
+      return inside;
+    }
+
+    function pointInMobilePolygon(point, polygon) {
+      const lng = normalizeLng(point[0]);
+      const lat = point[1];
+      const outer = unwrapRingNear(polygon.outer, lng);
+      if (!pointInRing([lng, lat], outer)) return false;
+
+      return !polygon.holes.some((hole) => {
+        const ring = unwrapRingNear(hole, lng);
+        return pointInRing([lng, lat], ring);
+      });
+    }
+
+    function squaredWrappedDistance(a, b) {
+      const lat = (a[1] + b[1]) / 2;
+      const lonScale = Math.max(0.15, Math.cos(lat * Math.PI / 180));
+      const dx = (wrapLngNear(a[0], b[0]) - b[0]) * lonScale;
+      const dy = a[1] - b[1];
+      return dx * dx + dy * dy;
+    }
+
+    function nearestPointOnRing(point, ring) {
+      const targetLng = normalizeLng(point[0]);
+      const targetLat = point[1];
+      const unwrapped = unwrapRingNear(ring, targetLng);
+      const lonScale = Math.max(0.15, Math.cos(targetLat * Math.PI / 180));
+      let best = null;
+
+      for (let i = 1; i < unwrapped.length; i++) {
+        const a = unwrapped[i - 1];
+        const b = unwrapped[i];
+        const ax = a[0] * lonScale;
+        const ay = a[1];
+        const bx = b[0] * lonScale;
+        const by = b[1];
+        const px = targetLng * lonScale;
+        const py = targetLat;
+        const vx = bx - ax;
+        const vy = by - ay;
+        const lenSq = vx * vx + vy * vy || 1;
+        const t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / lenSq));
+        const cx = ax + vx * t;
+        const cy = ay + vy * t;
+        const distSq = (px - cx) * (px - cx) + (py - cy) * (py - cy);
+
+        if (!best || distSq < best.distSq) {
+          best = { point: [cx / lonScale, cy], distSq };
+        }
+      }
+
+      return best || { point: [targetLng, targetLat], distSq: 0 };
+    }
+
+    function insetTowardInterior(point, polygon) {
+      const centerLng = wrapLngNear(polygon.center[0], point[0]);
+      const steps = [0.16, 0.24, 0.34, 0.48, 0.64];
+
+      for (const amount of steps) {
+        const candidate = [
+          point[0] + (centerLng - point[0]) * amount,
+          point[1] + (polygon.center[1] - point[1]) * amount
+        ];
+
+        if (pointInMobilePolygon(candidate, polygon)) {
+          return [normalizeLng(candidate[0]), candidate[1]];
+        }
+      }
+
+      return [normalizeLng(point[0]), point[1]];
+    }
+
+    function insetInsideIfNearBoundary(point, polygon) {
+      const nearest = nearestPointOnRing(point, polygon.outer);
+      const minMargin = 0.42;
+      if (nearest.distSq >= minMargin * minMargin) {
+        return [normalizeLng(point[0]), point[1]];
+      }
+
+      const lat = point[1];
+      const lonScale = Math.max(0.15, Math.cos(lat * Math.PI / 180));
+      const nearestLng = nearest.point[0];
+      const pointLng = wrapLngNear(point[0], nearestLng);
+      let vx = pointLng * lonScale - nearestLng * lonScale;
+      let vy = point[1] - nearest.point[1];
+      let len = Math.sqrt(vx * vx + vy * vy);
+
+      if (len < 1e-5) {
+        const centerLng = wrapLngNear(polygon.center[0], nearestLng);
+        vx = centerLng * lonScale - nearestLng * lonScale;
+        vy = polygon.center[1] - nearest.point[1];
+        len = Math.sqrt(vx * vx + vy * vy) || 1;
+      }
+
+      const distance = Math.max(minMargin, len);
+      const candidate = [
+        normalizeLng((nearestLng * lonScale + (vx / len) * distance) / lonScale),
+        nearest.point[1] + (vy / len) * distance
+      ];
+
+      if (pointInMobilePolygon(candidate, polygon)) return candidate;
+      return insetTowardInterior(nearest.point, polygon);
+    }
+
+    function constrainedPointInMobileArea(area, target) {
+      if (!area || !area.polygons || !area.polygons.length) return null;
+      const normalizedTarget = [normalizeLng(target[0]), target[1]];
+      let best = null;
+
+      area.polygons.forEach((polygon) => {
+        let candidate;
+        let distSq = 0;
+
+        if (pointInMobilePolygon(normalizedTarget, polygon)) {
+          candidate = insetInsideIfNearBoundary(normalizedTarget, polygon);
+          distSq = squaredWrappedDistance(candidate, normalizedTarget);
+        } else {
+          const nearest = nearestPointOnRing(normalizedTarget, polygon.outer);
+          candidate = insetTowardInterior(nearest.point, polygon);
+          distSq = squaredWrappedDistance(candidate, normalizedTarget);
+        }
+
+        if (!best || distSq < best.distSq) {
+          best = { point: candidate, distSq };
+        }
+      });
+
+      return best?.point || null;
+    }
+
     function collectCoords(node, out) {
       if (!Array.isArray(node)) return;
       if (typeof node[0] === "number" && typeof node[1] === "number") {
@@ -3079,56 +3431,90 @@
       if (!count) return "";
       return `
         <div class="unitStack ${type}">
-          <div class="coin c3"></div>
-          <div class="coin c2"></div>
-          <div class="coin"></div>
+          ${stackChipsHtml(count)}
           ${iconSvg(type, ownerColor || "#111827")}
           <div class="count">${count}</div>
         </div>
       `;
     }
 
+    function stackChipsHtml(count) {
+      const extraPieces = Math.max(0, count - 1);
+      const fiveChips = Math.floor(extraPieces / 5);
+      const whiteChips = extraPieces % 5;
+      const chips = [];
+      let index = 0;
+
+      for (let i = 0; i < fiveChips; i++) {
+        chips.push(`<div class="stackChip five" style="--i:${index};" aria-hidden="true"></div>`);
+        index++;
+      }
+
+      for (let i = 0; i < whiteChips; i++) {
+        chips.push(`<div class="stackChip one" style="--i:${index};" aria-hidden="true"></div>`);
+        index++;
+      }
+
+      return chips.join("");
+    }
+
+    function svgPiece(type, viewBox, body, colour) {
+      return `
+        <svg class="unitIcon unitIcon-${type}" viewBox="${viewBox}" style="--piece-colour:${colour || "#111827"};" aria-hidden="true">
+          ${body}
+        </svg>`;
+    }
+
     function iconSvg(type, colour) {
       if (type === "tank") {
-        return `
-          <svg class="unitIcon" viewBox="0 0 64 64">
-            <path fill="${colour}" d="M8 42h48v8H8z"/>
-            <path fill="#18181b" d="M18 32h26l8 10H12z"/>
-            <path fill="#111" d="M27 22h18v10H27z"/>
-            <circle cx="18" cy="52" r="5" fill="#111"/>
-            <circle cx="32" cy="52" r="5" fill="#111"/>
-            <circle cx="46" cy="52" r="5" fill="#111"/>
-          </svg>`;
+        return svgPiece("tank", "0 0 112 80", `
+          <path fill="currentColor" d="M12 50c0-10 8-18 18-18h55c10 0 18 8 18 18v2c0 10-8 18-18 18H30c-10 0-18-8-18-18v-2Z"/>
+          <path fill="currentColor" d="m30 32 16-16h31l16 16H30Z"/>
+          <path fill="currentColor" d="M52 15h34c4 0 8 3 8 7v5H46l6-12Z"/>
+          <path fill="currentColor" d="M87 19h24c3 0 5 2 5 4s-2 4-5 4H87v-8Z"/>
+          <path fill="currentColor" d="M24 57h67l-8 8H32l-8-8Z"/>
+        `, colour);
       }
 
       if (type === "air" || type === "fighter") {
-        return `
-          <svg class="unitIcon" viewBox="0 0 64 64">
-            <path fill="${colour}" d="M4 35l26-8V10h7l5 14 18-5v8l-18 9-5 18h-7V39L4 44z"/>
-          </svg>`;
+        return svgPiece("fighter", "0 0 120 90", `
+          <path fill="currentColor" d="M60 6c8 14 10 28 8 44l40 16-6 9-37-8-3 17h-4l-3-17-37 8-6-9 40-16C50 34 52 20 60 6Z"/>
+          <path fill="currentColor" d="M43 32h34l-5 23H48l-5-23Z"/>
+          <circle cx="60" cy="13" r="6" fill="currentColor"/>
+          <rect x="45" y="10" width="30" height="5" rx="2.5" fill="currentColor"/>
+          <rect x="57" y="0" width="6" height="28" rx="3" fill="currentColor"/>
+        `, colour);
       }
 
       if (type === "infantry") {
-        return `
-          <svg class="unitIcon" viewBox="0 0 64 64">
-            <path fill="${colour}" d="M31 6c9 0 16 7 16 16v9h5v27H12V31h5v-9c0-9 6-16 14-16z"/>
-            <path fill="#5c1111" d="M20 30h24v8H20z"/>
-          </svg>`;
+        return svgPiece("infantry", "0 0 270 180", `
+          <ellipse cx="68" cy="160" rx="47" ry="10" fill="currentColor"/>
+          <path fill="currentColor" d="M22 159c15 6 77 6 92 0 1 6-12 11-46 11s-48-5-46-11Z"/>
+          <path fill="currentColor" d="M57 36c9-11 29-12 40-2 7 6 9 14 6 23H76c-10 0-19-4-26-11 1-4 3-8 7-10Z"/>
+          <path fill="currentColor" d="M99 47h12c6 0 10 5 8 11l-2 8h-14l-8-8 4-11Z"/>
+          <path fill="currentColor" d="M48 60c-10 5-16 17-18 36l12 3 8-25 14-8-16-6Z"/>
+          <path fill="currentColor" d="M63 61h30c11 7 20 17 27 30l-11 10-22-20-11 24-23-5 4-23 6-16Z"/>
+          <path fill="currentColor" d="M90 82h24l17 11-5 10-24-5-17-9 5-7Z"/>
+          <path fill="currentColor" d="M121 79h30l12 8-17 11h-27l-7-10 9-9Z"/>
+          <rect x="146" y="81" width="84" height="5" rx="2.5" fill="currentColor" transform="rotate(-4 146 81)"/>
+          <rect x="227" y="79" width="24" height="3" rx="1.5" fill="currentColor" transform="rotate(-4 227 79)"/>
+          <path fill="currentColor" d="m250 77 18 4-17 7-2-5 1-6Z"/>
+          <rect x="160" y="75" width="13" height="4" rx="2" fill="currentColor" transform="rotate(-4 160 75)"/>
+          <path fill="currentColor" d="M151 90h10l-5 13h-7l2-13Z"/>
+          <path fill="currentColor" d="M69 100h25l24 28-8 14H89l-20-22-13 33H35l11-37 23-16Z"/>
+          <path fill="currentColor" d="M42 96h22l-9 28-29 23H6l7-14 26-20 3-17Z"/>
+          <path fill="currentColor" d="M31 79c-6 10-8 20-6 30h17l9-26-20-4Z"/>
+          <path fill="currentColor" d="M67 62h21l6 17H56l11-17Z"/>
+        `, colour);
       }
 
       if (type === "navy" || type === "navyBlue") {
-        return `
-          <svg class="unitIcon" viewBox="0 0 64 64">
-            <path fill="${colour}" d="M7 41c14-10 33-10 50 0l-5 10H12z"/>
-            <path fill="#172554" d="M23 23h18l10 18H13z"/>
-            <path fill="#111" d="M29 11h6v15h-6z"/>
-          </svg>`;
+        return navyIconSvg("destroyer", colour);
       }
 
-      return `
-        <svg class="unitIcon" viewBox="0 0 64 64">
-          <path fill="${colour}" d="M32 8l8 18 20 2-15 13 5 19-18-10-18 10 5-19L4 28l20-2z"/>
-        </svg>`;
+      return svgPiece("fighter", "0 0 120 90", `
+        <path fill="currentColor" d="M60 6c8 14 10 28 8 44l40 16-6 9-37-8-3 17h-4l-3-17-37 8-6-9 40-16C50 34 52 20 60 6Z"/>
+      `, colour);
     }
 
 
@@ -3189,9 +3575,7 @@
       if (!count) return "";
       return `
         <div class="navalStack ${type}">
-          <div class="coin c3"></div>
-          <div class="coin c2"></div>
-          <div class="coin"></div>
+          ${stackChipsHtml(count)}
           ${navyIconSvg(type, ownerColor || "#111827")}
           <div class="count">${count}</div>
         </div>
@@ -3200,42 +3584,47 @@
 
     function navyIconSvg(type, colour) {
       if (type === "carrier") {
-        return `
-          <svg class="unitIcon" viewBox="0 0 64 64">
-            <path fill="${colour}" d="M6 43c12-8 40-8 52 0l-6 11H12z"/>
-            <path fill="#111827" d="M14 35h36l8 8H6z"/>
-            <path fill="${colour}" d="M24 25h18v9H24z"/>
-            <path fill="#111827" d="M28 20h10v5H28z"/>
-            <path fill="#f8fafc" d="M18 39h28v3H18z" opacity=".75"/>
-          </svg>`;
+        return svgPiece("carrier", "0 0 390 90", `
+          <path fill="currentColor" d="M8 35h323l50 24v16H49L8 35Z"/>
+          <path fill="currentColor" d="M43 75h330l-45 13H82L43 75Z"/>
+          <rect x="265" y="11" width="45" height="24" rx="3" fill="currentColor"/>
+          <rect x="286" y="2" width="39" height="10" rx="3" fill="currentColor"/>
+          <path fill="currentColor" d="m102 53 14-9 25 18-16 9-23-18Z"/>
+          <path fill="currentColor" d="m178 60 13-8 23 16-14 8-22-16Z"/>
+        `, colour);
       }
 
       if (type === "battleship") {
-        return `
-          <svg class="unitIcon" viewBox="0 0 64 64">
-            <path fill="${colour}" d="M6 42c12-8 40-8 52 0l-6 11H12z"/>
-            <path fill="#111827" d="M18 33h28l7 9H11z"/>
-            <path fill="${colour}" d="M25 20h14v13H25z"/>
-            <path fill="#111827" d="M39 24h10v5H39z"/>
-          </svg>`;
+        return svgPiece("battleship", "0 0 350 88", `
+          <path fill="currentColor" d="M8 57h333l-43 25H56L8 57Z"/>
+          <path fill="currentColor" d="M25 44h298l18 13H9l16-13Z"/>
+          <path fill="currentColor" d="M138 25h75l21 19H117l21-19Z"/>
+          <path fill="currentColor" d="M157 25 174 4l19 21h-36Z"/>
+          <path fill="currentColor" d="M38 35h68l-15 10H25l13-10Z"/>
+          <path fill="currentColor" d="M108 32h61l-14 12H94l14-12Z"/>
+          <path fill="currentColor" d="M211 32h65l24 12h-89V32Z"/>
+          <path fill="currentColor" d="M276 36h50l16 10h-66V36Z"/>
+          <rect x="218" y="19" width="72" height="8" rx="4" fill="currentColor"/>
+        `, colour);
       }
 
       if (type === "destroyer") {
-        return `
-          <svg class="unitIcon" viewBox="0 0 64 64">
-            <path fill="${colour}" d="M7 43c14-7 36-7 50 0l-5 10H12z"/>
-            <path fill="#111827" d="M20 34h23l8 9H13z"/>
-            <path fill="${colour}" d="M29 24h10v10H29z"/>
-          </svg>`;
+        return svgPiece("destroyer", "0 0 250 80", `
+          <path fill="currentColor" d="M8 54 42 40h153l44 13-30 18H39L8 54Z"/>
+          <path fill="currentColor" d="M37 39h154l24 11H18l19-11Z"/>
+          <path fill="currentColor" d="M86 32h46l10 8H76l10-8Z"/>
+          <path fill="currentColor" d="M119 32 129 14h11l6 18h-27Z"/>
+          <path fill="currentColor" d="M38 35h46l-9 8H30l8-8Z"/>
+          <path fill="currentColor" d="M166 36h38l16 9h-54v-9Z"/>
+        `, colour);
       }
 
-      return `
-        <svg class="unitIcon" viewBox="0 0 64 64">
-          <path fill="${colour}" d="M8 41c5-10 43-10 48 0-5 10-43 10-48 0Z"/>
-          <path fill="#111827" d="M25 28h14v9H25z"/>
-          <circle cx="18" cy="41" r="3" fill="#111827"/>
-          <circle cx="46" cy="41" r="3" fill="#111827"/>
-        </svg>`;
+      return svgPiece("submarine", "0 0 210 80", `
+        <path fill="currentColor" d="M8 48c28-27 144-28 190-5l-23 24H35L8 48Z"/>
+        <path fill="currentColor" d="M75 34h64l14 14H61l14-14Z"/>
+        <rect x="94" y="18" width="25" height="17" rx="4" fill="currentColor"/>
+        <path fill="currentColor" d="m190 43 17-12v29l-17-12v-5Z"/>
+      `, colour);
     }
 
     function updatePlacedCount() {
@@ -3427,6 +3816,7 @@
         }
       });
 
+      syncMobileLargeCountryMarkers();
       syncPhysicalPieceZoomState();
       updateMarkerHemisphereVisibility(piecesVisible);
 
@@ -3834,6 +4224,7 @@
     map.on("render", () => {
       const piecesVisible = forcePieces === true || map.getZoom() >= getPieceRevealZoom();
       if (countryMarkers.length || navalMarkerRefs.length) {
+        syncMobileLargeCountryMarkers();
         syncPhysicalPieceZoomState();
         updateMarkerHemisphereVisibility(piecesVisible);
       }
