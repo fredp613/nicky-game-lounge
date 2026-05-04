@@ -2390,6 +2390,9 @@
       "United States": { name:"USA", ownerColor:powerColors.USA, textColor:"#fff", faction:"Allies", gpt:20, lon:-98.57, lat:39.82, zoom:4.7, units:{tank:5, infantry:7, fighter:5, navy:8} },
       "United Kingdom": { name:"UK", ownerColor:powerColors.UK, textColor:"#111827", faction:"Allies", gpt:15, lon:-2.0, lat:54.0, zoom:5.7, units:{tank:3, infantry:5, fighter:4, navy:8} },
       Russia: { name:"USSR", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:19, lon:65.0, lat:60.0, zoom:4.6, units:{tank:5, infantry:8, fighter:3, navy:2} },
+      Ukraine: { name:"Ukraine", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:4, lon:31.1, lat:49.1, zoom:6.1, units:{tank:1, infantry:3, fighter:1, navy:0} },
+      Belarus: { name:"Belarus", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:3, lon:28.0, lat:53.4, zoom:6.0, units:{tank:1, infantry:2, fighter:0, navy:0} },
+      Crimea: { name:"Crimea", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:2, lon:34.1, lat:45.2, zoom:6.5, units:{tank:1, infantry:1, fighter:0, navy:0} },
       China: { name:"China", ownerColor:powerColors.China, textColor:"#fff", faction:"Allies", gpt:13, lon:104.0, lat:35.0, zoom:4.9, units:{tank:1, infantry:7, fighter:1, navy:2} },
       France: { name:"France", ownerColor:powerColors.MinorAllies, textColor:"#fff", faction:"Allies", gpt:12, lon:2.2, lat:46.2, zoom:5.9, units:{tank:2, infantry:4, fighter:2, navy:1} },
       Canada: { name:"Canada", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:8, lon:-106.3, lat:56.1, zoom:4.8, units:{tank:2, infantry:3, fighter:2, navy:2} },
@@ -2418,6 +2421,7 @@
       "Germany", "Italy", "Japan",
       "United States", "United States of America",
       "United Kingdom", "Russia", "China",
+      "Ukraine", "Belarus", "Crimea",
       "India", "Egypt", "Australia", "Canada",
       "France", "Brazil", "Mexico", "South Africa",
       "Hungary", "Romania", "Finland",
@@ -2452,6 +2456,9 @@
       Japan: { units:{tank:3, infantry:8, fighter:4, navy:8}, zoom:5.9 },
       USA: { units:{tank:2, infantry:4, fighter:3, navy:7}, zoom:4.9 },
       USSR: { units:{tank:2, infantry:10, fighter:2, navy:1}, zoom:4.9 },
+      Ukraine: { units:{tank:1, infantry:3, fighter:1, navy:0}, zoom:6.1 },
+      Belarus: { units:{tank:1, infantry:2, fighter:0, navy:0}, zoom:6.0 },
+      Crimea: { units:{tank:1, infantry:1, fighter:0, navy:0}, zoom:6.5 },
       UK: { units:{tank:2, infantry:6, fighter:3, navy:6}, zoom:5.8 },
       China: { units:{tank:0, infantry:6, fighter:1, navy:0}, zoom:5.1 },
       Canada: { units:{tank:1, infantry:2, fighter:1, navy:1}, zoom:5.0 },
@@ -2483,6 +2490,31 @@
         if (o.zoom) m.zoom = o.zoom;
       }
     });
+
+    const customLandTerritories = [
+      {
+        type: "Feature",
+        properties: { name: "Crimea" },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [32.35, 45.25],
+            [32.78, 45.55],
+            [33.58, 45.78],
+            [34.42, 45.62],
+            [35.28, 45.24],
+            [36.33, 45.32],
+            [36.63, 44.98],
+            [36.22, 44.63],
+            [35.35, 44.38],
+            [34.58, 44.48],
+            [33.72, 44.36],
+            [32.92, 44.58],
+            [32.35, 45.25]
+          ]]
+        }
+      }
+    ];
 
     const navalZones = [
       { name:"SZ 1 North Atlantic", owner:"UK", lon:-34, lat:54, ownerColor:powerColors.UK, textColor:"#111827", count:3, ships:{carrier:0, battleship:1, destroyer:1, submarine:1} },
@@ -2785,6 +2817,12 @@
         }
       });
 
+      customLandTerritories.forEach((feature) => {
+        const customFeature = JSON.parse(JSON.stringify(feature));
+        decorateFeature(customFeature);
+        geojson.features.push(customFeature);
+      });
+
       map.addSource("countries", {
         type: "geojson",
         data: geojson
@@ -2884,6 +2922,124 @@
             7,
             1
           ]
+        }
+      });
+
+      map.addLayer({
+        id: "soviet-territory-border-halo",
+        type: "line",
+        source: "countries",
+        filter: ["any",
+          ["==", ["get", "name"], "Russia"],
+          ["==", ["get", "name"], "Ukraine"],
+          ["==", ["get", "name"], "Belarus"],
+          ["==", ["get", "name"], "Crimea"]
+        ],
+        paint: {
+          "line-color": powerColors.USSR,
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            3.8,
+            3,
+            5.6,
+            6,
+            8.2,
+            9,
+            11.2
+          ],
+          "line-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            0.9,
+            7,
+            1
+          ]
+        }
+      });
+
+      map.addLayer({
+        id: "soviet-territory-borders",
+        type: "line",
+        source: "countries",
+        filter: ["any",
+          ["==", ["get", "name"], "Russia"],
+          ["==", ["get", "name"], "Ukraine"],
+          ["==", ["get", "name"], "Belarus"],
+          ["==", ["get", "name"], "Crimea"]
+        ],
+        paint: {
+          "line-color": "#ffe0b5",
+          "line-width": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            1.8,
+            3,
+            2.8,
+            6,
+            4.2,
+            9,
+            5.8
+          ],
+          "line-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            0.92,
+            7,
+            1
+          ]
+        }
+      });
+
+      const customBoundaryFeatures = customLandTerritories.map((feature) => ({
+        type: "Feature",
+        properties: { name: feature.properties.name },
+        geometry: {
+          type: "LineString",
+          coordinates: feature.geometry.coordinates[0]
+        }
+      }));
+
+      map.addSource("custom-territory-boundaries", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: customBoundaryFeatures }
+      });
+
+      map.addLayer({
+        id: "custom-territory-border-halo",
+        type: "line",
+        source: "custom-territory-boundaries",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": powerColors.USSR,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 0, 4.0, 6, 9.0, 9, 12.0],
+          "line-opacity": 0.95
+        }
+      });
+
+      map.addLayer({
+        id: "custom-territory-borders",
+        type: "line",
+        source: "custom-territory-boundaries",
+        layout: {
+          "line-cap": "round",
+          "line-join": "round"
+        },
+        paint: {
+          "line-color": "#ffe0b5",
+          "line-width": ["interpolate", ["linear"], ["zoom"], 0, 2.0, 6, 4.8, 9, 6.2],
+          "line-opacity": 1
         }
       });
 
@@ -3025,6 +3181,7 @@
       props.ownerColor = participant?.ownerColor || props.politicalColor;
       props.textColor = participant?.textColor || badgeTextColor(props.ownerColor);
       props.majorPower = !!participant && (
+        participant.faction === "USSR" ||
         participant.gpt >= 12 ||
         ["Germany", "USA", "USSR", "UK", "Japan", "Italy", "China", "France"].includes(participant.name)
       );
@@ -3128,6 +3285,7 @@
     function mobileLandOwnerForFeature(name) {
       const participant = participants[name];
       if (participant && MOBILE_LAND_POWERS.has(participant.name)) return participant.name;
+      // The USSR mobile marker follows only the Russia border; nearby Soviet territories keep their own stacks.
       if (name === "Russia" || name === "Russian Federation") return "USSR";
       if (name === "United States" || name === "United States of America") return "USA";
       return null;
