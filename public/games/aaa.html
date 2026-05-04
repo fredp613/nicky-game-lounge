@@ -2356,7 +2356,11 @@
     let viewMode = "globe";
     let forcePieces = false;
     let countryMarkers = [];
-    const MOBILE_LAND_POWERS = new Set(["USA", "USSR"]);
+    const MOBILE_LAND_POWERS = new Set(["USA", "USSR", "Canada"]);
+    const MOBILE_MARKER_INTERIOR_FACTOR = 0.15;
+    const MOBILE_MARKER_SMOOTHING = 0.18;
+    const BALTIC_COMPONENT_COUNTRIES = ["Estonia", "Latvia", "Lithuania"];
+    const SOVIET_BORDER_TERRITORIES = ["Russia", "Ukraine", "Belarus", "Crimea"];
     const mobileLandAreas = new Map();
 
     const powerColors = {
@@ -2393,6 +2397,7 @@
       Ukraine: { name:"Ukraine", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:4, lon:31.1, lat:49.1, zoom:6.1, units:{tank:1, infantry:3, fighter:1, navy:0} },
       Belarus: { name:"Belarus", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:3, lon:28.0, lat:53.4, zoom:6.0, units:{tank:1, infantry:2, fighter:0, navy:0} },
       Crimea: { name:"Crimea", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:2, lon:34.1, lat:45.2, zoom:6.5, units:{tank:1, infantry:1, fighter:0, navy:0} },
+      Latvia: { name:"Latvia", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:3, lon:24.3, lat:56.7, zoom:6.4, units:{tank:1, infantry:3, fighter:1, navy:0} },
       China: { name:"China", ownerColor:powerColors.China, textColor:"#fff", faction:"Allies", gpt:13, lon:104.0, lat:35.0, zoom:4.9, units:{tank:1, infantry:7, fighter:1, navy:2} },
       France: { name:"France", ownerColor:powerColors.MinorAllies, textColor:"#fff", faction:"Allies", gpt:12, lon:2.2, lat:46.2, zoom:5.9, units:{tank:2, infantry:4, fighter:2, navy:1} },
       Canada: { name:"Canada", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:8, lon:-106.3, lat:56.1, zoom:4.8, units:{tank:2, infantry:3, fighter:2, navy:2} },
@@ -2421,7 +2426,7 @@
       "Germany", "Italy", "Japan",
       "United States", "United States of America",
       "United Kingdom", "Russia", "China",
-      "Ukraine", "Belarus", "Crimea",
+      "Ukraine", "Belarus", "Crimea", "Latvia",
       "India", "Egypt", "Australia", "Canada",
       "France", "Brazil", "Mexico", "South Africa",
       "Hungary", "Romania", "Finland",
@@ -2459,6 +2464,7 @@
       Ukraine: { units:{tank:1, infantry:3, fighter:1, navy:0}, zoom:6.1 },
       Belarus: { units:{tank:1, infantry:2, fighter:0, navy:0}, zoom:6.0 },
       Crimea: { units:{tank:1, infantry:1, fighter:0, navy:0}, zoom:6.5 },
+      Latvia: { units:{tank:1, infantry:3, fighter:1, navy:0}, zoom:6.4 },
       UK: { units:{tank:2, infantry:6, fighter:3, navy:6}, zoom:5.8 },
       China: { units:{tank:0, infantry:6, fighter:1, navy:0}, zoom:5.1 },
       Canada: { units:{tank:1, infantry:2, fighter:1, navy:1}, zoom:5.0 },
@@ -2494,7 +2500,39 @@
     const customLandTerritories = [
       {
         type: "Feature",
-        properties: { name: "Crimea" },
+        properties: { name: "Latvia", customTerritory: true, boundaryOnly: true },
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [19.55, 54.28],
+            [20.42, 54.12],
+            [21.72, 54.20],
+            [22.95, 54.34],
+            [24.12, 54.72],
+            [25.72, 54.82],
+            [27.08, 55.30],
+            [28.38, 56.02],
+            [29.05, 57.00],
+            [29.28, 58.10],
+            [28.78, 59.05],
+            [27.66, 59.35],
+            [26.18, 59.60],
+            [24.72, 59.70],
+            [23.62, 59.38],
+            [23.10, 58.72],
+            [22.35, 58.22],
+            [21.65, 57.66],
+            [21.05, 56.92],
+            [21.35, 56.06],
+            [20.85, 55.28],
+            [19.95, 54.82],
+            [19.55, 54.28]
+          ]]
+        }
+      },
+      {
+        type: "Feature",
+        properties: { name: "Crimea", customTerritory: true },
         geometry: {
           type: "Polygon",
           coordinates: [[
@@ -2615,17 +2653,44 @@
       if (!mobileLandAreas.size || !countryMarkers.length) return;
       const center = map.getCenter();
       const target = [center.lng, center.lat];
+      let needsRepaint = false;
 
       countryMarkers.forEach((ref) => {
         if (!MOBILE_LAND_POWERS.has(ref.country.name)) return;
         const area = mobileLandAreas.get(ref.country.name);
-        const point = constrainedPointInMobileArea(area, target);
-        if (!point) return;
+        const desired = constrainedPointInMobileArea(area, target);
+        if (!desired) return;
 
+        let point = desired;
+        const currentLon = Number.isFinite(ref.displayLon) ? ref.displayLon : ref.lon;
+        const currentLat = Number.isFinite(ref.displayLat) ? ref.displayLat : ref.lat;
+
+        if (ref.mobileInitialized && Number.isFinite(currentLon) && Number.isFinite(currentLat)) {
+          const desiredLng = wrapLngNear(desired[0], currentLon);
+          point = [
+            normalizeLng(currentLon + (desiredLng - currentLon) * MOBILE_MARKER_SMOOTHING),
+            currentLat + (desired[1] - currentLat) * MOBILE_MARKER_SMOOTHING
+          ];
+
+          if (!pointInMobileArea(area, point)) {
+            point = desired;
+          }
+
+          needsRepaint = needsRepaint || squaredWrappedDistance(point, desired) > 0.0009;
+        } else {
+          ref.mobileInitialized = true;
+        }
+
+        ref.displayLon = point[0];
+        ref.displayLat = point[1];
         ref.lon = point[0];
         ref.lat = point[1];
         ref.marker.setLngLat(point);
       });
+
+      if (needsRepaint && map.triggerRepaint) {
+        map.triggerRepaint();
+      }
     }
 
 
@@ -2817,11 +2882,12 @@
         }
       });
 
-      customLandTerritories.forEach((feature) => {
+      const decoratedCustomLandTerritories = customLandTerritories.map((feature) => {
         const customFeature = JSON.parse(JSON.stringify(feature));
         decorateFeature(customFeature);
-        geojson.features.push(customFeature);
+        return customFeature;
       });
+      geojson.features.push(...decoratedCustomLandTerritories);
 
       map.addSource("countries", {
         type: "geojson",
@@ -2854,6 +2920,11 @@
         id: "country-borders",
         type: "line",
         source: "countries",
+        filter: ["all",
+          ["!=", ["get", "name"], "Estonia"],
+          ["!=", ["get", "name"], "Latvia"],
+          ["!=", ["get", "name"], "Lithuania"]
+        ],
         paint: {
           "line-color": [
             "case",
@@ -2893,7 +2964,12 @@
         id: "major-country-borders",
         type: "line",
         source: "countries",
-        filter: ["==", ["get", "majorPower"], true],
+        filter: ["all",
+          ["==", ["get", "majorPower"], true],
+          ["!=", ["get", "name"], "Estonia"],
+          ["!=", ["get", "name"], "Latvia"],
+          ["!=", ["get", "name"], "Lithuania"]
+        ],
         paint: {
           "line-color": [
             "case",
@@ -2921,6 +2997,33 @@
             .86,
             7,
             1
+          ]
+        }
+      });
+
+      map.addSource("custom-land-territories", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: decoratedCustomLandTerritories }
+      });
+
+      map.addLayer({
+        id: "custom-land-fills",
+        type: "fill",
+        source: "custom-land-territories",
+        paint: {
+          "fill-color": ["get", "politicalColor"],
+          "fill-opacity": [
+            "interpolate",
+            ["linear"],
+            ["zoom"],
+            0,
+            0.56,
+            3,
+            0.50,
+            6,
+            0.38,
+            9,
+            0.18
           ]
         }
       });
@@ -3044,7 +3147,11 @@
       });
 
       const gdpPointFeatures = geojson.features
-        .filter((feature) => shouldShowIpcBadge(feature.properties?.name))
+        .filter((feature) => {
+          const name = feature.properties?.name;
+          if (!shouldShowIpcBadge(name)) return false;
+          return !BALTIC_COMPONENT_COUNTRIES.includes(name) || feature.properties?.customTerritory === true;
+        })
         .map((feature) => {
           const center = featureCenter(feature);
           return {
@@ -3181,7 +3288,7 @@
       props.ownerColor = participant?.ownerColor || props.politicalColor;
       props.textColor = participant?.textColor || badgeTextColor(props.ownerColor);
       props.majorPower = !!participant && (
-        participant.faction === "USSR" ||
+        SOVIET_BORDER_TERRITORIES.includes(name) ||
         participant.gpt >= 12 ||
         ["Germany", "USA", "USSR", "UK", "Japan", "Italy", "China", "France"].includes(participant.name)
       );
@@ -3383,6 +3490,10 @@
       });
     }
 
+    function pointInMobileArea(area, point) {
+      return !!area?.polygons?.some((polygon) => pointInMobilePolygon(point, polygon));
+    }
+
     function squaredWrappedDistance(a, b) {
       const lat = (a[1] + b[1]) / 2;
       const lonScale = Math.max(0.15, Math.cos(lat * Math.PI / 180));
@@ -3425,7 +3536,7 @@
 
     function insetTowardInterior(point, polygon) {
       const centerLng = wrapLngNear(polygon.center[0], point[0]);
-      const steps = [0.16, 0.24, 0.34, 0.48, 0.64];
+      const steps = [MOBILE_MARKER_INTERIOR_FACTOR, 0.24, 0.34, 0.48, 0.64];
 
       for (const amount of steps) {
         const candidate = [
@@ -3436,6 +3547,20 @@
         if (pointInMobilePolygon(candidate, polygon)) {
           return [normalizeLng(candidate[0]), candidate[1]];
         }
+      }
+
+      return [normalizeLng(point[0]), point[1]];
+    }
+
+    function pullTowardInterior(point, polygon, amount = MOBILE_MARKER_INTERIOR_FACTOR) {
+      const centerLng = wrapLngNear(polygon.center[0], point[0]);
+      const candidate = [
+        point[0] + (centerLng - point[0]) * amount,
+        point[1] + (polygon.center[1] - point[1]) * amount
+      ];
+
+      if (pointInMobilePolygon(candidate, polygon)) {
+        return [normalizeLng(candidate[0]), candidate[1]];
       }
 
       return [normalizeLng(point[0]), point[1]];
@@ -3484,10 +3609,12 @@
 
         if (pointInMobilePolygon(normalizedTarget, polygon)) {
           candidate = insetInsideIfNearBoundary(normalizedTarget, polygon);
+          candidate = pullTowardInterior(candidate, polygon);
           distSq = squaredWrappedDistance(candidate, normalizedTarget);
         } else {
           const nearest = nearestPointOnRing(normalizedTarget, polygon.outer);
           candidate = insetTowardInterior(nearest.point, polygon);
+          candidate = pullTowardInterior(candidate, polygon);
           distSq = squaredWrappedDistance(candidate, normalizedTarget);
         }
 
@@ -4001,6 +4128,13 @@
         "fill-color",
         colourMode === "strength" ? ["get", "strengthColor"] : ["get", "politicalColor"]
       );
+      if (map.getLayer("custom-land-fills")) {
+        map.setPaintProperty(
+          "custom-land-fills",
+          "fill-color",
+          colourMode === "strength" ? ["get", "strengthColor"] : ["get", "politicalColor"]
+        );
+      }
       updateModeReadout();
       refreshHudPanelIfOpen();
     }
