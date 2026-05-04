@@ -1,0 +1,256 @@
+<div class="page-bg">
+    <!-- Floating pixel particles -->
+    <div class="particles" id="particles"></div>
+
+    <!-- Hero Section -->
+    <header class="hero-section">
+        <div class="container">
+            <div class="row align-items-center justify-content-center">
+                <div class="col-lg-5 col-md-6 text-center mb-4 mb-md-0">
+                    <div class="nicky-sprite-wrapper" id="nickySprite">
+                        <!-- Nicky SVG Sprite -->
+                        <svg viewBox="0 0 260 340" xmlns="http://www.w3.org/2000/svg" class="nicky-svg" aria-label="Nicky — a fun 4 year old boy">
+                            <!-- Shadow -->
+                            <ellipse cx="130" cy="330" rx="55" ry="10" fill="rgba(0,0,0,0.15)" class="nicky-shadow"/>
+
+                            <!-- Left Leg -->
+                            <g class="nicky-left-leg">
+                                <rect x="105" y="260" width="22" height="50" rx="10" fill="#3d6fb5"/>
+                                <!-- Shoe -->
+                                <ellipse cx="114" cy="312" rx="18" ry="12" fill="#e84040"/>
+                                <ellipse cx="110" cy="309" rx="8" ry="5" fill="rgba(255,255,255,0.2)"/>
+                                <!-- Shoe stripe -->
+                                <rect x="100" y="306" width="28" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+                            </g>
+
+                            <!-- Right Leg -->
+                            <g class="nicky-right-leg">
+                                <rect x="133" y="260" width="22" height="50" rx="10" fill="#3468a8"/>
+                                <!-- Shoe -->
+                                <ellipse cx="146" cy="312" rx="18" ry="12" fill="#d63636"/>
+                                <ellipse cx="142" cy="309" rx="8" ry="5" fill="rgba(255,255,255,0.2)"/>
+                                <rect x="132" y="306" width="28" height="3" rx="1.5" fill="rgba(255,255,255,0.35)"/>
+                            </g>
+
+                            <!-- Body / T-shirt -->
+                            <g class="nicky-body">
+                                <!-- Torso -->
+                                <rect x="95" y="175" width="70" height="92" rx="20" fill="#e84040"/>
+                                <!-- Shirt highlight -->
+                                <rect x="100" y="178" width="25" height="60" rx="12" fill="rgba(255,255,255,0.1)"/>
+                                <!-- Maple leaf on shirt -->
+                                <g transform="translate(130,218) scale(0.55)">
+                                    <path d="M0,-28 L4,-12 L18,-16 L12,-6 L24,2 L12,4 L16,18 L6,12 L0,26 L-6,12 L-16,18 L-12,4 L-24,2 L-12,-6 L-18,-16 L-4,-12 Z"
+                                          fill="rgba(255,255,255,0.85)" stroke="none"/>
+                                </g>
+                                <!-- Shorts -->
+                                <rect x="98" y="252" width="64" height="22" rx="10" fill="#3d6fb5"/>
+                            </g>
+
+                            <!-- Left Arm -->
+                            <g class="nicky-left-arm">
+                                <rect x="72" y="185" width="28" height="18" rx="9" fill="#e84040"/>
+                                <!-- Forearm (skin) -->
+                                <rect x="58" y="188" width="22" height="14" rx="7" fill="#ffd6a5"/>
+                                <!-- Hand -->
+                                <circle cx="58" cy="195" r="10" fill="#ffe0b8"/>
+                                <circle cx="56" cy="192" r="3" fill="rgba(255,255,255,0.2)"/>
+                            </g>
+
+                            <!-- Right Arm — holding controller -->
+                            <g class="nicky-right-arm">
+                                <rect x="160" y="185" width="28" height="18" rx="9" fill="#e84040"/>
+                                <!-- Forearm -->
+                                <rect x="180" y="188" width="22" height="14" rx="7" fill="#ffd6a5"/>
+                                <!-- Hand -->
+                                <circle cx="202" cy="195" r="10" fill="#ffe0b8"/>
+                                <!-- Game controller -->
+                                <g transform="translate(198,186) rotate(15)" class="nicky-controller">
+                                    <rect x="-16" y="-8" width="32" height="16" rx="6" fill="#2d2d3d"/>
+                                    <rect x="-14" y="-6" width="28" height="12" rx="4" fill="#3a3a50"/>
+                                    <!-- D-pad -->
+                                    <rect x="-11" y="-3" width="8" height="2" rx="0.5" fill="#555"/>
+                                    <rect x="-9" y="-5" width="2" height="8" rx="0.5" fill="#555"/>
+                                    <!-- Buttons -->
+                                    <circle cx="8" cy="-2" r="2" fill="#e84040"/>
+                                    <circle cx="12" cy="0" r="2" fill="#4CAF50"/>
+                                    <!-- Glow -->
+                                    <circle cx="0" cy="-2" r="1" fill="#4af" class="controller-glow"/>
+                                </g>
+                            </g>
+
+                            <!-- Neck -->
+                            <rect x="120" y="168" width="20" height="16" rx="8" fill="#ffd6a5"/>
+
+                            <!-- Head -->
+                            <g class="nicky-head">
+                                <!-- Head shape -->
+                                <ellipse cx="130" cy="130" rx="52" ry="50" fill="#ffd6a5"/>
+                                <!-- Cheek blush -->
+                                <ellipse cx="98" cy="142" rx="14" ry="9" fill="rgba(255,120,120,0.3)"/>
+                                <ellipse cx="162" cy="142" rx="14" ry="9" fill="rgba(255,120,120,0.3)"/>
+                                <!-- Freckles -->
+                                <circle cx="94" cy="138" r="1.5" fill="rgba(180,120,80,0.4)"/>
+                                <circle cx="100" cy="135" r="1.2" fill="rgba(180,120,80,0.3)"/>
+                                <circle cx="160" cy="138" r="1.5" fill="rgba(180,120,80,0.4)"/>
+                                <circle cx="166" cy="135" r="1.2" fill="rgba(180,120,80,0.3)"/>
+
+                                <!-- Eyes -->
+                                <g class="nicky-eyes">
+                                    <!-- Left eye -->
+                                    <ellipse cx="112" cy="125" rx="11" ry="13" fill="white"/>
+                                    <circle cx="114" cy="126" r="7" fill="#3d2c1a"/>
+                                    <circle cx="114" cy="126" r="4.5" fill="#1a1008"/>
+                                    <circle cx="117" cy="122" r="2.8" fill="rgba(255,255,255,0.9)"/>
+                                    <circle cx="111" cy="128" r="1.5" fill="rgba(255,255,255,0.4)"/>
+                                    <!-- Right eye -->
+                                    <ellipse cx="148" cy="125" rx="11" ry="13" fill="white"/>
+                                    <circle cx="150" cy="126" r="7" fill="#3d2c1a"/>
+                                    <circle cx="150" cy="126" r="4.5" fill="#1a1008"/>
+                                    <circle cx="153" cy="122" r="2.8" fill="rgba(255,255,255,0.9)"/>
+                                    <circle cx="147" cy="128" r="1.5" fill="rgba(255,255,255,0.4)"/>
+                                </g>
+
+                                <!-- Eyebrows -->
+                                <path d="M100,112 Q112,106 122,112" stroke="#6b4423" stroke-width="3" fill="none" stroke-linecap="round" class="nicky-brow-l"/>
+                                <path d="M138,112 Q148,106 160,112" stroke="#6b4423" stroke-width="3" fill="none" stroke-linecap="round" class="nicky-brow-r"/>
+
+                                <!-- Big silly grin -->
+                                <path d="M108,148 Q118,168 130,168 Q142,168 152,148" stroke="#c0523a" stroke-width="3" fill="none" stroke-linecap="round"/>
+                                <!-- Tongue sticking out -->
+                                <ellipse cx="130" cy="165" rx="8" ry="6" fill="#e87070" class="nicky-tongue"/>
+                                <ellipse cx="130" cy="163" rx="5" ry="3" fill="rgba(255,255,255,0.15)"/>
+                                <!-- Tooth -->
+                                <rect x="122" y="148" width="7" height="7" rx="2" fill="white" opacity="0.9"/>
+                                <rect x="131" y="148" width="7" height="7" rx="2" fill="white" opacity="0.9"/>
+
+                                <!-- Nose -->
+                                <ellipse cx="130" cy="138" rx="6" ry="5" fill="#f0b888"/>
+                                <ellipse cx="128" cy="136" rx="2.5" ry="2" fill="rgba(255,255,255,0.2)"/>
+
+                                <!-- Hair — messy kid hair -->
+                                <g class="nicky-hair">
+                                    <ellipse cx="130" cy="88" rx="50" ry="22" fill="#6b4423"/>
+                                    <ellipse cx="100" cy="98" rx="18" ry="20" fill="#6b4423"/>
+                                    <ellipse cx="160" cy="98" rx="18" ry="20" fill="#6b4423"/>
+                                    <ellipse cx="130" cy="82" rx="42" ry="16" fill="#7d5030"/>
+                                    <!-- Messy bits sticking up -->
+                                    <path d="M108,78 Q105,62 115,70" fill="#6b4423"/>
+                                    <path d="M130,75 Q132,58 138,68" fill="#7d5030"/>
+                                    <path d="M148,78 Q155,60 150,72" fill="#6b4423"/>
+                                    <!-- Hair highlight -->
+                                    <ellipse cx="125" cy="80" rx="18" ry="6" fill="rgba(255,255,255,0.08)"/>
+                                </g>
+
+                                <!-- Toque (Canadian beanie) -->
+                                <g class="nicky-toque">
+                                    <!-- Beanie body -->
+                                    <ellipse cx="130" cy="82" rx="46" ry="24" fill="#e84040"/>
+                                    <path d="M84,82 Q84,56 130,52 Q176,56 176,82" fill="#e84040"/>
+                                    <!-- White stripe -->
+                                    <rect x="86" y="74" width="88" height="8" rx="4" fill="rgba(255,255,255,0.85)"/>
+                                    <!-- Fold at bottom -->
+                                    <rect x="84" y="82" width="92" height="12" rx="5" fill="#cc3636"/>
+                                    <rect x="84" y="82" width="92" height="4" rx="2" fill="rgba(255,255,255,0.12)"/>
+                                    <!-- Pom-pom -->
+                                    <circle cx="130" cy="46" r="14" fill="white" class="nicky-pompom"/>
+                                    <circle cx="125" cy="42" r="3" fill="rgba(0,0,0,0.04)"/>
+                                    <circle cx="135" cy="44" r="2.5" fill="rgba(0,0,0,0.04)"/>
+                                    <circle cx="130" cy="48" r="2" fill="rgba(0,0,0,0.04)"/>
+                                    <circle cx="127" cy="40" r="5" fill="rgba(255,255,255,0.3)"/>
+                                </g>
+
+                                <!-- Ears -->
+                                <ellipse cx="80" cy="130" rx="10" ry="14" fill="#ffd6a5"/>
+                                <ellipse cx="80" cy="130" rx="6" ry="9" fill="rgba(255,150,130,0.25)"/>
+                                <ellipse cx="180" cy="130" rx="10" ry="14" fill="#ffd6a5"/>
+                                <ellipse cx="180" cy="130" rx="6" ry="9" fill="rgba(255,150,130,0.25)"/>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-6 text-center text-md-start">
+                    <div class="hero-text">
+                        <h1 class="hero-title">
+                            <span class="hero-title-line">Nicky's</span>
+                            <span class="hero-title-line accent">Game Lounge</span>
+                        </h1>
+                        <p class="hero-subtitle">Pick a game &amp; let's play! <span class="emoji-bounce">🎮</span></p>
+                        <a href="#games" class="btn btn-play">
+                            <span>BROWSE GAMES</span>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3v14m0 0l6-6m-6 6l-6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Games Section -->
+    <section class="games-section" id="games">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Games</h2>
+                <div class="section-line"></div>
+            </div>
+            <div class="row g-4">
+                {{#each games}}
+                <div class="col-lg-4 col-md-6">
+                    <a href="{{this.url}}" class="game-tile {{#if this.comingSoon}}coming-soon{{/if}}" style="--tile-accent: {{this.color}}">
+                        <div class="tile-icon-area">
+                            {{#if (eq this.icon 'mushroom')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><ellipse cx="32" cy="38" rx="22" ry="16" fill="currentColor" opacity="0.9"/><path d="M10,36 Q10,14 32,10 Q54,14 54,36" fill="currentColor"/><circle cx="22" cy="24" r="6" fill="rgba(255,255,255,0.4)"/><circle cx="42" cy="20" r="5" fill="rgba(255,255,255,0.4)"/><circle cx="32" cy="30" r="4" fill="rgba(255,255,255,0.4)"/><rect x="26" y="38" width="12" height="14" rx="4" fill="rgba(255,255,255,0.6)"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'snowflake')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="32" y1="8" x2="32" y2="56"/><line x1="12" y1="20" x2="52" y2="44"/><line x1="12" y1="44" x2="52" y2="20"/><line x1="32" y1="8" x2="26" y2="14"/><line x1="32" y1="8" x2="38" y2="14"/><line x1="32" y1="56" x2="26" y2="50"/><line x1="32" y1="56" x2="38" y2="50"/></g></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'leaf')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><path d="M32,54 Q12,40 14,22 Q16,8 36,8 Q56,8 54,28 Q52,44 32,54Z" fill="currentColor" opacity="0.9"/><path d="M32,54 Q30,38 36,22" stroke="rgba(255,255,255,0.4)" stroke-width="2" fill="none"/><path d="M28,40 Q32,36 40,34" stroke="rgba(255,255,255,0.3)" stroke-width="1.5" fill="none"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'dino')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><ellipse cx="32" cy="38" rx="18" ry="16" fill="currentColor"/><ellipse cx="40" cy="24" rx="14" ry="12" fill="currentColor"/><circle cx="44" cy="22" r="4" fill="rgba(255,255,255,0.6)"/><circle cx="45" cy="22" r="2" fill="rgba(0,0,0,0.5)"/><rect x="20" y="48" width="8" height="12" rx="3" fill="currentColor"/><rect x="36" y="48" width="8" height="12" rx="3" fill="currentColor"/><path d="M26,26 L28,18 L30,26 L32,18 L34,26" fill="currentColor"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'rocket')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><path d="M32,8 Q22,24 22,42 L32,50 L42,42 Q42,24 32,8Z" fill="currentColor"/><ellipse cx="32" cy="28" rx="5" ry="6" fill="rgba(255,255,255,0.5)"/><path d="M22,38 Q14,42 16,50 L22,44Z" fill="currentColor" opacity="0.7"/><path d="M42,38 Q50,42 48,50 L42,44Z" fill="currentColor" opacity="0.7"/><path d="M26,50 L28,58 L32,52 L36,58 L38,50Z" fill="#FFB74D"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'bug')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><ellipse cx="32" cy="38" rx="16" ry="18" fill="currentColor"/><circle cx="32" cy="20" r="10" fill="currentColor"/><circle cx="28" cy="18" r="3" fill="rgba(255,255,255,0.6)"/><circle cx="36" cy="18" r="3" fill="rgba(255,255,255,0.6)"/><circle cx="28" cy="18" r="1.5" fill="rgba(0,0,0,0.5)"/><circle cx="36" cy="18" r="1.5" fill="rgba(0,0,0,0.5)"/><line x1="24" y1="12" x2="18" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="40" y1="12" x2="46" y2="4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="4" r="2" fill="currentColor"/><circle cx="46" cy="4" r="2" fill="currentColor"/><line x1="16" y1="34" x2="8" y2="30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="48" y1="34" x2="56" y2="30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="16" y1="42" x2="8" y2="46" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="48" y1="42" x2="56" y2="46" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'snake')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><path d="M10,48 Q10,38 20,38 L30,38 Q38,38 38,30 L38,22 Q38,14 48,14 Q56,14 56,22" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="round"/><path d="M10,48 Q10,38 20,38 L30,38 Q38,38 38,30 L38,22 Q38,14 48,14 Q56,14 56,22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="5" stroke-linecap="round"/><circle cx="56" cy="22" r="7" fill="currentColor"/><circle cx="53" cy="19" r="2.5" fill="rgba(255,255,255,0.8)"/><circle cx="59" cy="19" r="2.5" fill="rgba(255,255,255,0.8)"/><circle cx="53" cy="19" r="1.2" fill="rgba(0,0,0,0.6)"/><circle cx="59" cy="19" r="1.2" fill="rgba(0,0,0,0.6)"/><path d="M54,27 Q56,30 58,27" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'globe')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64" aria-label="Globe strategy game icon"><circle cx="32" cy="32" r="26" fill="currentColor" opacity="0.16"/><circle cx="32" cy="32" r="23" fill="none" stroke="currentColor" stroke-width="3"/><ellipse cx="32" cy="32" rx="11" ry="23" fill="none" stroke="currentColor" stroke-width="2" opacity="0.75"/><path d="M10 32 H54" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.75"/><path d="M15 22 H49" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity="0.45"/><path d="M15 42 H49" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity="0.45"/><path d="M20 21 Q25 16 31 20 Q29 25 24 27 Q19 27 20 21Z" fill="currentColor" opacity="0.9"/><path d="M37 18 Q46 20 47 28 Q42 31 37 27 Q34 23 37 18Z" fill="currentColor" opacity="0.65"/><path d="M27 38 Q34 34 41 39 Q39 47 30 47 Q24 44 27 38Z" fill="currentColor" opacity="0.78"/><g transform="translate(42 39)"><circle cx="0" cy="8" r="8" fill="currentColor" opacity="0.9"/><circle cx="0" cy="4" r="8" fill="currentColor" opacity="0.75"/><circle cx="0" cy="0" r="8" fill="currentColor"/><text x="0" y="4" text-anchor="middle" font-size="10" font-weight="900" fill="rgba(255,255,255,0.92)">7</text></g><path d="M12 48 Q32 58 52 46" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" opacity="0.55"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'pong')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><rect x="6" y="18" width="8" height="28" rx="4" fill="currentColor"/><rect x="50" y="18" width="8" height="28" rx="4" fill="currentColor" opacity="0.6"/><line x1="32" y1="8" x2="32" y2="56" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-dasharray="5,5"/><circle cx="32" cy="32" r="6" fill="currentColor"/><circle cx="29" cy="29" r="2" fill="rgba(255,255,255,0.5)"/></svg>
+                            {{/if}}
+                            {{#if (eq this.icon 'pacman')}}
+                            <svg class="tile-icon" viewBox="0 0 64 64"><path d="M32,32 L56,22 A26,26 0 1,0 56,42 Z" fill="currentColor"/><circle cx="32" cy="18" r="3" fill="rgba(255,255,255,0.9)"/><circle cx="46" cy="14" r="4" fill="rgba(255,255,255,0.5)"/><circle cx="55" cy="24" r="3" fill="rgba(255,255,255,0.5)"/><circle cx="55" cy="36" r="3" fill="rgba(255,255,255,0.5)"/><circle cx="46" cy="46" r="4" fill="rgba(255,255,255,0.5)"/></svg>
+                            {{/if}}
+                        </div>
+                        <div class="tile-content">
+                            <span class="tile-tag">{{this.tag}}</span>
+                            <h3 class="tile-title">{{this.title}}</h3>
+                            <p class="tile-desc">{{this.description}}</p>
+                            {{#unless this.comingSoon}}
+                            <span class="tile-play-btn">PLAY NOW ▶</span>
+                            {{/unless}}
+                            {{#if this.comingSoon}}
+                            <span class="tile-soon-badge">🔒 Coming Soon</span>
+                            {{/if}}
+                        </div>
+                    </a>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container text-center">
+            <p>Made with ❤️ for Nicky &mdash; The silliest gamer in Canada 🇨🇦</p>
+        </div>
+    </footer>
+</div>

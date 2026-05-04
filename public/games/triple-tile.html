@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Triple Cascade</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#06090f; overflow:hidden; }
+canvas { display:block; cursor:default; touch-action:none; position:fixed; top:0; left:0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+
+// ── Canvas ────────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// W and H are set dynamically by resize() below — declared here for scope
+let W = 760, H = 520;
+
+// ── Layout constants ──────────────────────────────────────────────────────────
+const HUD_H   = 58;
+const ZONE_H  = 98;
+const BOARD_TOP = HUD_H + 6;
+
+// These depend on H/W and are recomputed in resize()
+let BOARD_BOT   = H - ZONE_H;
+let BOARD_MID_Y = BOARD_TOP + (BOARD_BOT - BOARD_TOP) / 2;
+
+// Tile geometry (fixed)
+const TW = 60, TH = 56, TGAP = 6;
+const DEPTH = 4;
+const LAYER_DX = 4;   // per-layer x-shift (right = depth)
+const LAYER_DY = -8;  // per-layer y-shift (negative = elevated above grid)
+const TR = 10;
+
+// Zone (SW/SH scale on narrow screens, recomputed in resize())
+const SLOTS = 7;
+let SW = 62, SH = 58;
+let ZONE_CY = H - ZONE_H / 2 + 4;
+
+// ── Palette — Space / Lunar Futuristic ────────────────────────────────────────
+const C = {
+  bg:      '#06090f',
+  hud:     'rgba(4,6,14,0.98)',
+  // tile faces [top, bottom]
+  fAcc:    ['#2e5080','#1c3a62'],   // bright steel-blue — clearly visible on dark bg
+  fHov:    ['#1a6ea0','#0d4e78'],   // bright teal — hovered
+  fCov:    ['#141e2e','#0c1520'],   // near-black — clearly inaccessible
+  fZone:   ['#1e5272','#103a56'],   // distinct warm-teal tray colour
+  tEdge:   'rgba(100,180,255,0.80)',// bright border (accessible)
+  tEdgeCov:'rgba(40,65,110,0.35)', // dim border (covered)
+  tDepth:  '#04080f',               // shadow depth block
+  tShine:  'rgba(120,220,255,0.18)',// holographic top-edge streak
+  // UI
+  accent:  '#00e5ff',
+  aDim:    'rgba(0,229,255,0.18)',
+  purple:  '#a855f7',
+  gold:    '#00e5ff',
+  green:   '#34d399',
+  red:     '#f87171',
+  white:   '#e0f0ff',
+  textHi:  '#00e5ff',
+  textMid: 'rgba(160,210,255,0.85)',
+  textLo:  'rgba(80,140,200,0.50)',
+  // Zone
+  slotFill:'rgba(0,229,255,0.03)',
+  slotBrd: 'rgba(0,229,255,0.14)',
+  zoneBg:  'rgba(0,229,255,0.02)',
+  zoneBrd: 'rgba(0,229,255,0.20)',
+  zoneDgr: 'rgba(248,113,113,0.70)',
+};
+
+// ── Emoji tile types ──────────────────────────────────────────────────────────
+const TYPES = ['🐰','⭐','🎀','🥚','🌸','🍄','💎','🔔','🌿','🎯','🏮','🎪'];
+
+// ── 100-stage dynamic generator ───────────────────────────────────────────────
+//
+// 10 layout templates, each producing a tile count divisible by 3.
+// Later stages use larger, more layered templates.
+// typeCount ramps from 5 → 12 across the 100 stages.
+//
+// Template tile counts:
+//   T0=21  T1=24  T2=33  T3=30  T4=36
+//   T5=39  T6=42  T7=48  T8=51  T9=54
+//
+// Layer-0: integer grid.  Layer-1: half-offset (each tile overlaps 4 below).
+// Layer-2: integer grid again (each tile overlaps 4 layer-1 tiles).
+
+const STAGE_NAMES = [
+  // Stages 0-9
+  'Lunar Orbit','Solar Drift','Dark Nebula','Nova Gate','Void Flare',
+  'Kuiper Belt','Event Horizon','Pulsar Ridge','Titan Base','Europa Arc',
+  // 10-19
+  'Mars Transit','Jupiter Loop','Saturn Ring','Io Storm','Callisto Drop',
+  'Ganymede Arc','Pluto Edge','Neptune Deep','Andromeda','Cygnus Run',
+  // 20-29
+  'Stellar Wake','Photon Drift','Dark Matter','Quasar Gate','Singularity',
+  'Oort Cloud','Helix Nebula','Crab Pulsar','Titan Storm','Enceladus Run',
+  // 30-39
+  'Red Dwarf','White Dwarf','Neutron Star','Black Hole','Wormhole Edge',
+  'Tidal Force','Solar Wind','Cosmic Ray','Gamma Burst','Hawking Zone',
+  // 40-49
+  'Binary Star','Rogue Planet','Dark Energy','Plasma Field','Ion Trail',
+  'Comet Surge','Meteor Storm','Dust Cloud','Galactic Core','Spiral Arm',
+  // 50-59
+  'Void Walker','Star Forge','Deep Space','Null Point','Quantum Drift',
+  'Lagrange Zone','Graviton Arc','Photosphere','Chromosphere','Corona Ring',
+  // 60-69
+  'Far Reaches','Outer Rim','Void Sector','Star Cluster','Open Cluster',
+  'Globular Hub','Nebula Forge','Plasma Vent','Solar Apex','Zenith Gate',
+  // 70-79
+  'Nadir Drop','Perihelion','Aphelion Run','Transit Arc','Occult Zone',
+  'Parallax Drift','Proper Motion','Redshift Run','Blueshift Gate','Hubble Edge',
+  // 80-89
+  'Interstellar','Intergalactic','Multiverse','Omega Nebula','Alpha Ring',
+  'Proxima Run','Barnard Arc','Sirius Gate','Vega Drift','Altair Storm',
+  // 90-99
+  'Deneb Edge','Rigel Core','Betelgeuse','Antares Ring','Arcturus Prime',
+  'Final Orbit','Last Light','Zero Point','Absolute Zero','Omega Point',
+];
+
+// Max meaningful type count per template (tile_count / 3, capped to 12)
+const TEMPLATE_MAX_TYPES = [7, 8, 11, 10, 12, 12, 12, 12, 12, 12];
+
+function templateForStage(i){
+  if(i<10) return 0;   // 21 tiles — easy intro
+  if(i<20) return 1;   // 24 tiles
+  if(i<30) return i%2===0 ? 2 : 3; // 33 / 30 tiles, alternating
+  if(i<40) return 4;   // 36 tiles
+  if(i<50) return 5;   // 39 tiles
+  if(i<60) return 6;   // 42 tiles
+  if(i<70) return 7;   // 48 tiles
+  if(i<80) return 8;   // 51 tiles (3-layer)
+  return 9;            // 54 tiles — hardest
+}
+
+function makeLayout(t){
+  switch(t){
+    case 0: return [  // 21 tiles: 3×5 base + L1 2×3
+      ...[0,1,2,3,4].flatMap(c=>[0,1,2].map(r=>[0,r,c])),
+      ...[1.5,2.5,3.5].flatMap(c=>[0.5,1.5].map(r=>[1,r,c])),
+    ];
+    case 1: return [  // 24 tiles: 3×6 base + L1 2×3
+      ...[0,1,2,3,4,5].flatMap(c=>[0,1,2].map(r=>[0,r,c])),
+      ...[1.5,2.5,3.5].flatMap(c=>[0.5,1.5].map(r=>[1,r,c])),
+    ];
+    case 2: return [  // 33 tiles: 4×6 base + L1 3×3
+      ...[0,1,2,3,4,5].flatMap(c=>[0,1,2,3].map(r=>[0,r,c])),
+      ...[1.5,2.5,3.5].flatMap(c=>[0.5,1.5,2.5].map(r=>[1,r,c])),
+    ];
+    case 3: return [  // 30 tiles: 4×5 base + L1 3×3 + L2 1
+      ...[0,1,2,3,4].flatMap(c=>[0,1,2,3].map(r=>[0,r,c])),
+      ...[0.5,1.5,2.5].flatMap(c=>[0.5,1.5,2.5].map(r=>[1,r,c])),
+      [2,1,2],  // single L2 tile — blocks 4 inner L1 tiles
+    ];
+    case 4: return [  // 36 tiles: 4×6 base + L1 3×4
+      ...[0,1,2,3,4,5].flatMap(c=>[0,1,2,3].map(r=>[0,r,c])),
+      ...[0.5,1.5,2.5,3.5].flatMap(c=>[0.5,1.5,2.5].map(r=>[1,r,c])),
+    ];
+    case 5: return [  // 39 tiles: 5×6 base + L1 3×3
+      ...[0,1,2,3,4,5].flatMap(c=>[0,1,2,3,4].map(r=>[0,r,c])),
+      ...[1.5,2.5,3.5].flatMap(c=>[0.5,1.5,2.5].map(r=>[1,r,c])),
+    ];
+    case 6: return [  // 42 tiles: 5×6 base + L1 3×4
+      ...[0,1,2,3,4,5].flatMap(c=>[0,1,2,3,4].map(r=>[0,r,c])),
+      ...[0.5,1.5,2.5,3.5].flatMap(c=>[0.5,1.5,2.5].map(r=>[1,r,c])),
+    ];
+    case 7: return [  // 48 tiles: 6×6 base + L1 3×4
+      ...[0,1,2,3,4,5].flatMap(c=>[0,1,2,3,4,5].map(r=>[0,r,c])),
+      ...[0.5,1.5,2.5,3.5].flatMap(c=>[1.5,2.5,3.5].map(r=>[1,r,c])),
+    ];
+    case 8: return [  // 51 tiles: 6×6 base + L1 3×4 + L2 3
+      ...[0,1,2,3,4,5].flatMap(c=>[0,1,2,3,4,5].map(r=>[0,r,c])),
+      ...[0.5,1.5,2.5,3.5].flatMap(c=>[1.5,2.5,3.5].map(r=>[1,r,c])),
+      [2,2,1],[2,2,2],[2,2,3],  // 3 L2 tiles across inner rows
+    ];
+    default: return [  // 54 tiles: 6×7 base + L1 3×4
+      ...[0,1,2,3,4,5,6].flatMap(c=>[0,1,2,3,4,5].map(r=>[0,r,c])),
+      ...[1.5,2.5,3.5,4.5].flatMap(c=>[1.5,2.5,3.5].map(r=>[1,r,c])),
+    ];
+  }
+}
+
+
+// ── Difficulty configuration ───────────────────────────────────────────────────
+// cycleLen : how many stages before templates repeat (shorter = faster ramp)
+// maxStages: total stages before WIN_ALL
+// sptAt    : [s1, s2] — absolute stage indices where spt bumps to 2, then 3
+const DIFF = {
+  easy: {
+    label:'EASY', icon:'🌙', color:'#34d399',
+    tagline:'Learn the cosmos',
+    details:['Slow difficulty ramp','200 stages'],
+    cycleLen:30, maxStages:200, sptAt:[90,150],
+  },
+  medium: {
+    label:'MEDIUM', icon:'⚡', color:'#f97316',
+    tagline:'Pick up the pace',
+    details:['Faster ramp','400 stages'],
+    cycleLen:15, maxStages:400, sptAt:[45,120],
+  },
+  hard: {
+    label:'HARD', icon:'☄️', color:'#f87171',
+    tagline:'Only the worthy',
+    details:['Brutal ramp','600 stages'],
+    cycleLen:10, maxStages:600, sptAt:[20,50],
+  },
+};
+let diffKey = 'easy'; // set on difficulty select screen
+
+// Cycle suffix for repeated stage names in long runs
+const CYCLE_SFX = ['','·II','·III','·IV','·V','·VI'];
+
+function getStageConfig(si){
+  const cfg = DIFF[diffKey];
+  const { cycleLen, sptAt } = cfg;
+  const posInCycle = si % cycleLen;
+  // Map 0..cycleLen-1 evenly to template indices 0..9
+  const tIdx = Math.min(9, Math.floor(posInCycle * 10 / cycleLen));
+  const spt  = si >= sptAt[1] ? 3 : si >= sptAt[0] ? 2 : 1;
+  const layout = makeLayout(tIdx);
+  const n = layout.length;
+  const tilesPerType = 3 * spt;
+  const maxByQuota = Math.floor(n / tilesPerType);
+  const maxByTypes = TEMPLATE_MAX_TYPES[tIdx];
+  const desired    = Math.min(12, 5 + Math.floor(posInCycle * 7 / cycleLen));
+  const typeCount  = Math.min(desired, Math.min(maxByQuota, maxByTypes));
+  // Name with cycle suffix once we wrap past the name pool
+  const cycle = Math.floor(si / STAGE_NAMES.length);
+  const name  = STAGE_NAMES[si % STAGE_NAMES.length] + (CYCLE_SFX[Math.min(cycle,5)]||'');
+  return { name, typeCount, setsPerType:spt, layout };
+}
+
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let gstate='MENU';  // MENU | PLAYING | STAGE_CLEAR | DEAD | WIN_ALL
+let tiles=[], zone=[];
+let stageIdx=0, stagesCleared=0, score=0;
+let combo=0, comboTimer=0;
+let hints=3, undos=3, shuffles=2;
+let particles=[], toasts=[];
+let hoveredTile=null, hoveredDiff=null;
+let frame=0;
+let zoneShake=0, stageClearTimer=0;
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+// ── Board generation ──────────────────────────────────────────────────────────
+function generateTiles(si){
+  const lv = getStageConfig(si);
+  const n  = lv.layout.length;
+  const tc = lv.typeCount;
+
+  const spt          = lv.setsPerType || 1;
+  const tilesPerType = 3 * spt;        // e.g. 3, 6, or 9
+  const baseCount    = tc * tilesPerType;
+  const leftover     = n - baseCount;   // always divisible by 3 given our caps
+  const extraSets    = leftover / 3;
+
+  // Build pool
+  const pool = [];
+  TYPES.slice(0,tc).forEach((t,i)=>{
+    const count = tilesPerType + (i < extraSets ? 3 : 0);
+    for(let s=0;s<count;s++) pool.push(t);
+  });
+  shuffle(pool);
+
+  return [...lv.layout]
+    .sort((a,b)=>a[0]-b[0]||a[1]-b[1]||a[2]-b[2])
+    .map((pos,i)=>({
+      id:i,
+      layer:pos[0], row:pos[1], col:pos[2],
+      type:pool[i],
+      state:'idle',       // idle | inzone | matched
+      x:0, y:0,
+      accessible:false,
+      hinted:false,
+    }));
+}
+
+function computePositions(tls){
+  // First pass – place at origin using grid coords + layer offsets
+  tls.forEach(t=>{
+    t.x = t.col*(TW+TGAP) + t.layer*LAYER_DX;
+    t.y = t.row*(TH+TGAP) + t.layer*LAYER_DY;
+  });
+  // Compute actual bounding box
+  const minX = Math.min(...tls.map(t=>t.x));
+  const maxX = Math.max(...tls.map(t=>t.x+TW));
+  const minY = Math.min(...tls.map(t=>t.y));
+  const maxY = Math.max(...tls.map(t=>t.y+TH));
+  // Shift to centre in board area
+  const offX = W/2        - (minX+maxX)/2;
+  const offY = BOARD_MID_Y - (minY+maxY)/2;
+  tls.forEach(t=>{ t.x+=offX; t.y+=offY; });
+}
+
+function computeAccess(tls){
+  tls.forEach(t=>{
+    if(t.state!=='idle'){ t.accessible=false; return; }
+    // Blocked if any higher-layer idle tile overlaps this one.
+    // With half-offset stacking, one upper tile can block up to 4 lower tiles
+    // (its centre sits within 1 grid unit of each blocked tile's centre).
+    t.accessible = !tls.some(o=>
+      o.id!==t.id && o.state==='idle' &&
+      o.layer > t.layer &&
+      Math.abs(o.row - t.row) < 1 &&
+      Math.abs(o.col - t.col) < 1
+    );
+  });
+}
+
+// ── Top-layer constraint ──────────────────────────────────────────────────────
+// Ensures no symbol appears 3+ times among accessible tiles on the initial
+// board (and after any shuffle). Swaps accessible over-represented tiles with
+// randomly chosen covered tiles until the constraint is satisfied.
+// This forces players to think about what's hidden rather than just clearing
+// whatever triples are immediately visible.
+function constrainTopLayer(tls){
+  const MAX_VISIBLE = 2;
+  for(let attempt=0; attempt<120; attempt++){
+    computeAccess(tls);
+    const acc = tls.filter(t=>t.accessible && t.state==='idle');
+    const cnt = {};
+    acc.forEach(t=>{ cnt[t.type]=(cnt[t.type]||0)+1; });
+    // Find an accessible tile whose type is over-represented
+    const over = acc.find(t=>cnt[t.type]>MAX_VISIBLE);
+    if(!over) break;  // constraint satisfied
+    // Swap it with a random covered tile that has a less-represented type
+    const covered = tls.filter(t=>!t.accessible && t.state==='idle');
+    if(!covered.length) break;
+    const target = covered.find(c=>(cnt[c.type]||0)<MAX_VISIBLE) || covered[Math.floor(Math.random()*covered.length)];
+    [over.type, target.type] = [target.type, over.type];
+  }
+}
+
+function initStage(si){
+  stageIdx=si;
+  tiles=generateTiles(si);
+  computePositions(tiles);
+  computeAccess(tiles);
+  constrainTopLayer(tiles);  // ensure no 3+ of same symbol visible at start
+  zone=[]; hoveredTile=null;
+  zoneShake=0; combo=0; comboTimer=0;
+  particles=[]; toasts=[];
+}
+
+// ── Zone slot centres ─────────────────────────────────────────────────────────
+function slotCX(i){
+  const total=SLOTS*(SW+6);
+  return W/2 - total/2 + i*(SW+6) + SW/2;
+}
+
+// ── Game actions ──────────────────────────────────────────────────────────────
+function tapTile(tile){
+  if(!tile.accessible || tile.state!=='idle') return;
+  if(zone.length>=SLOTS) return;
+
+  tile.state='inzone';
+  zone.push(tile);
+  computeAccess(tiles);
+  doMatchCheck();
+
+  // Fail: zone full, no match
+  if(zone.length>=SLOTS && !canMatch()){
+    zoneShake=2.0;
+    setTimeout(()=>{ gstate='DEAD'; },700);
+    return;
+  }
+  checkWin();
+}
+
+function canMatch(){
+  const cnt={};
+  zone.forEach(t=>{ cnt[t.type]=(cnt[t.type]||0)+1; });
+  return Object.values(cnt).some(v=>v>=3);
+}
+
+function doMatchCheck(){
+  // Loop to handle cascades (board cleared → zone had multiple triples)
+  let anyPass=true;
+  while(anyPass){
+    anyPass=false;
+    const cnt={};
+    zone.forEach(t=>{ cnt[t.type]=(cnt[t.type]||0)+1; });
+    for(const [type,count] of Object.entries(cnt)){
+      if(count>=3){
+        let rm=0; const nz=[];
+        zone.forEach(t=>{
+          if(t.type===type&&rm<3){ t.state='matched'; rm++; }
+          else nz.push(t);
+        });
+        zone=nz;
+        combo++; comboTimer=130;
+        const pts=100*combo;
+        score+=pts;
+        const cols=[C.gold,C.accent,C.purple];
+        burst(W/2,ZONE_CY,cols[combo%cols.length],22,5);
+        addToast(
+          `+${pts}${combo>1?` ×${combo} COMBO!`:''}`,
+          W/2, ZONE_CY-46, combo>1?C.accent:C.textHi
+        );
+        anyPass=true;
+      }
+    }
+  }
+}
+
+function checkWin(){
+  if(tiles.filter(t=>t.state==='idle').length===0 && zone.length===0){
+    stagesCleared++;
+    const bonus=500+stageIdx*250;
+    score+=bonus;
+    addToast(`+${bonus} STAGE BONUS!`,W/2,BOARD_MID_Y,C.gold);
+    burst(W/2,BOARD_MID_Y,C.gold,40,6);
+    stageClearTimer=155;
+    gstate='STAGE_CLEAR';
+  }
+}
+
+function doHint(){
+  if(hints<=0) return;
+  const acc=tiles.filter(t=>t.accessible);
+  if(!acc.length) return;
+  const cnt={};
+  zone.forEach(t=>{ cnt[t.type]=(cnt[t.type]||0)+1; });
+  // Prefer a tile type already partially in zone
+  const target=acc.find(t=>(cnt[t.type]||0)>=1) || acc[0];
+  target.hinted=true; hints--;
+  setTimeout(()=>{ target.hinted=false; },2800);
+}
+
+function doUndo(){
+  if(undos<=0||zone.length===0) return;
+  const t=zone.pop();
+  t.state='idle'; t.hinted=false;
+  computeAccess(tiles); undos--;
+  addToast('UNDO ↩',W/2,BOARD_MID_Y-18,C.textMid);
+}
+
+function doShuffle(){
+  if(shuffles<=0) return;
+  const idle=tiles.filter(t=>t.state==='idle');
+  const types=shuffle(idle.map(t=>t.type));
+  idle.forEach((t,i)=>{ t.type=types[i]; t.hinted=false; });
+  constrainTopLayer(tiles);  // never leave 3+ of same symbol accessible
+  shuffles--;
+  burst(W/2,BOARD_MID_Y,C.purple,34,6);
+  addToast('SHUFFLED! 🔀',W/2,BOARD_MID_Y,C.purple);
+}
+
+function startGame(){
+  score=0; stagesCleared=0;
+  hints=3; undos=3; shuffles=2;
+  initStage(0); gstate='PLAYING';
+}
+
+// ── Particles & toasts ────────────────────────────────────────────────────────
+function burst(x,y,color,n=12,sz=4){
+  for(let i=0;i<n;i++){
+    const a=(Math.PI*2*i/n)+Math.random()*0.7;
+    const sp=2+Math.random()*5;
+    particles.push({
+      x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-2.2,
+      color, sz:sz+Math.random()*2, life:1, dec:0.016+Math.random()*0.02,
+    });
+  }
+}
+function addToast(text,x,y,color){
+  toasts.push({text,x,y,color,life:1});
+}
+function updateFX(){
+  // Decrement FIRST, then remove dead entries — prevents negative life reaching drawFX
+  particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=0.14; p.life-=p.dec; });
+  particles=particles.filter(p=>p.life>0);
+  toasts.forEach(t=>{ t.y-=1.1; t.life-=0.011; });
+  toasts=toasts.filter(t=>t.life>0);
+}
+
+// ── Draw helpers ──────────────────────────────────────────────────────────────
+function rr(x,y,w,h,r=8){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
+function glassPanel(x,y,w,h,r=14){
+  ctx.fillStyle='rgba(4,8,18,0.94)'; rr(x,y,w,h,r); ctx.fill();
+  ctx.strokeStyle='rgba(0,229,255,0.20)'; ctx.lineWidth=1.5; rr(x,y,w,h,r); ctx.stroke();
+}
+function overlay(a=0.82){
+  ctx.fillStyle=`rgba(13,8,18,${a})`; ctx.fillRect(0,0,W,H);
+}
+
+// ── Draw one tile ─────────────────────────────────────────────────────────────
+function drawTile(t, inZone=false, zx=0, zy=0){
+  const x = inZone ? zx-SW/2 : t.x;
+  const y = inZone ? zy-SH/2 : t.y;
+  const w = inZone ? SW : TW;
+  const h = inZone ? SH : TH;
+  const acc = t.accessible && !inZone;
+  const hov = t===hoveredTile && acc;
+  const hnt = t.hinted && acc;
+
+  // ── 3D depth block (board tiles only) ──────────────────────────────────────
+  if(!inZone){
+    ctx.fillStyle=C.tDepth;
+    rr(x+DEPTH,y+DEPTH,w,h,TR); ctx.fill();
+  }
+
+  // ── Face gradient ──────────────────────────────────────────────────────────
+  const fc = inZone ? C.fZone : hov||hnt ? C.fHov : acc ? C.fAcc : C.fCov;
+  const g  = ctx.createLinearGradient(x,y,x,y+h);
+  g.addColorStop(0,fc[0]); g.addColorStop(1,fc[1]);
+  rr(x,y,w,h,TR); ctx.fillStyle=g; ctx.fill();
+
+  // ── Inner rim highlight on accessible / zone tiles ─────────────────────────
+  if(acc||inZone){
+    ctx.strokeStyle='rgba(140,210,255,0.30)';
+    ctx.lineWidth=1; rr(x+1,y+1,w-2,h-2,TR-1); ctx.stroke();
+  }
+
+  // ── Outer border ───────────────────────────────────────────────────────────
+  ctx.strokeStyle = (!inZone&&!acc) ? C.tEdgeCov : C.tEdge;
+  ctx.lineWidth=1.5; rr(x,y,w,h,TR); ctx.stroke();
+
+  // ── Glow ring (hover / hint) ────────────────────────────────────────────────
+  if(hov||hnt){
+    ctx.save();
+    ctx.shadowColor=hnt?C.purple:C.accent; ctx.shadowBlur=24;
+    ctx.strokeStyle=hnt?C.purple:C.accent; ctx.lineWidth=2.5;
+    rr(x,y,w,h,TR); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Top-edge light streak ──────────────────────────────────────────────────
+  if(acc||inZone){
+    const streak=ctx.createLinearGradient(x+8,y,x+w-8,y);
+    streak.addColorStop(0,'rgba(120,200,255,0.0)');
+    streak.addColorStop(0.3,'rgba(120,200,255,0.28)');
+    streak.addColorStop(0.7,'rgba(120,200,255,0.28)');
+    streak.addColorStop(1,'rgba(120,200,255,0.0)');
+    ctx.fillStyle=streak;
+    ctx.fillRect(x+8,y+3,w-16,3);
+  }
+
+  // ── Emoji ──────────────────────────────────────────────────────────────────
+  // iOS Safari applies ctx.fillStyle as a colour tint to emoji drawn with
+  // fillText. The last fillStyle was a blue gradient, making every emoji
+  // appear as a blue silhouette. Explicitly setting 'black' here tells Safari
+  // to render emoji in their native full colour. shadowBlur must also be 0
+  // (any active shadow also strips emoji colour on iOS).
+  const em = inZone ? 30 : acc ? 27 : 20;
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'black';          // ← iOS Safari emoji colour fix
+  ctx.font = `${em}px serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.globalAlpha = (acc||inZone) ? 1 : 0.30;
+  ctx.fillText(t.type, x+w/2, y+h/2+1);
+  ctx.globalAlpha = 1;
+}
+
+// ── Draw board ────────────────────────────────────────────────────────────────
+function drawBoard(){
+  // Board area tint
+  ctx.fillStyle='rgba(0,229,255,0.015)';
+  rr(16,BOARD_TOP,W-32,BOARD_BOT-BOARD_TOP-4,12); ctx.fill();
+  ctx.strokeStyle='rgba(0,229,255,0.07)'; ctx.lineWidth=1;
+  rr(16,BOARD_TOP,W-32,BOARD_BOT-BOARD_TOP-4,12); ctx.stroke();
+
+  // Tiles back-to-front (lower layer drawn first)
+  [...tiles]
+    .filter(t=>t.state==='idle')
+    .sort((a,b)=>a.layer-b.layer||a.row-b.row)
+    .forEach(t=>drawTile(t));
+}
+
+// ── Draw zone ─────────────────────────────────────────────────────────────────
+function drawZone(){
+  const danger = zone.length>=6;
+  const shX    = zoneShake>0 ? Math.sin(frame*1.3)*6*zoneShake : 0;
+  ctx.save(); ctx.translate(shX,0);
+
+  const zx=16, zy=H-ZONE_H+7, zw=W-32, zh=ZONE_H-13;
+  ctx.fillStyle=C.zoneBg; rr(zx,zy,zw,zh,12); ctx.fill();
+  ctx.strokeStyle=danger?C.zoneDgr:C.zoneBrd;
+  ctx.lineWidth=danger?2:1.5; rr(zx,zy,zw,zh,12); ctx.stroke();
+
+  // Label
+  ctx.font='10px "Helvetica Neue",Arial,sans-serif';
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle=C.textLo;
+  ctx.fillText('ELIMINATION ZONE',zx+12,zy+13);
+  if(zone.length>=4){
+    ctx.textAlign='right';
+    ctx.font='bold 10px "Helvetica Neue",Arial,sans-serif';
+    ctx.fillStyle=danger?C.red:C.accent;
+    ctx.fillText(`${zone.length}/7${danger?' ⚠ DANGER':''}`,zx+zw-12,zy+13);
+  }
+
+  // Empty slot backgrounds
+  for(let i=0;i<SLOTS;i++){
+    if(!zone[i]){
+      const sx=slotCX(i)-SW/2, sy=ZONE_CY-SH/2;
+      ctx.fillStyle=C.slotFill; rr(sx,sy,SW,SH,8); ctx.fill();
+      ctx.strokeStyle=C.slotBrd; ctx.lineWidth=1; rr(sx,sy,SW,SH,8); ctx.stroke();
+      // Slot index hint
+      ctx.font='10px "Helvetica Neue",Arial,sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle='rgba(0,229,255,0.12)';
+      ctx.fillText(i+1,sx+SW/2,sy+SH/2);
+    }
+  }
+
+  // Tiles in zone
+  zone.forEach((t,i)=>drawTile(t,true,slotCX(i),ZONE_CY));
+  ctx.restore();
+}
+
+// ── Draw HUD ──────────────────────────────────────────────────────────────────
+function drawHUD(){
+  ctx.fillStyle=C.hud; ctx.fillRect(0,0,W,HUD_H);
+  ctx.strokeStyle='rgba(0,229,255,0.14)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,HUD_H); ctx.lineTo(W,HUD_H); ctx.stroke();
+
+  // Score (left)
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.font='bold 10px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textLo;
+  ctx.fillText('SCORE',14,18);
+  ctx.font='bold 28px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.gold;
+  ctx.fillText(score.toLocaleString(),14,46);
+
+  // Stage + tiles remaining (centre)
+  const lv=getStageConfig(stageIdx);
+  ctx.textAlign='center';
+  ctx.font='bold 10px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textLo;
+  ctx.fillText(`STAGE ${stageIdx+1} · ${lv.name.toUpperCase()}`,W/2,16);
+  const rem=tiles.filter(t=>t.state==='idle').length;
+  ctx.font='bold 14px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textMid;
+  ctx.fillText(`${rem} tile${rem!==1?'s':''} remaining`,W/2,35);
+  if(combo>1&&comboTimer>0){
+    ctx.font='bold 12px "Helvetica Neue",Arial,sans-serif';
+    ctx.fillStyle=C.accent; ctx.shadowColor=C.accent; ctx.shadowBlur=10;
+    ctx.fillText(`🔥 ×${combo} COMBO!`,W/2,52); ctx.shadowBlur=0;
+  }
+
+  // Power-up buttons (right)
+  const btns=[
+    {label:'HINT',icon:'💡',n:hints,    x:W-180},
+    {label:'UNDO',icon:'↩', n:undos,   x:W-112},
+    {label:'SHUF',icon:'🔀',n:shuffles, x:W-44},
+  ];
+  btns.forEach(b=>{
+    const on=b.n>0;
+    ctx.fillStyle=on?'rgba(0,229,255,0.08)':'rgba(255,255,255,0.02)';
+    rr(b.x-30,5,60,HUD_H-10,7); ctx.fill();
+    ctx.strokeStyle=on?C.aDim:'rgba(255,255,255,0.05)';
+    ctx.lineWidth=1; rr(b.x-30,5,60,HUD_H-10,7); ctx.stroke();
+
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.font='14px serif';
+    ctx.fillStyle=on?C.textMid:'rgba(255,255,255,0.18)';
+    ctx.fillText(b.icon,b.x,25);
+    ctx.font='bold 9px "Helvetica Neue",Arial,sans-serif';
+    ctx.fillStyle=on?C.accent:'rgba(255,255,255,0.15)';
+    ctx.fillText(b.label,b.x,38);
+    ctx.font='bold 15px "Helvetica Neue",Arial,sans-serif';
+    ctx.fillStyle=on?C.textHi:'rgba(255,255,255,0.18)';
+    ctx.fillText(b.n,b.x,52);
+  });
+}
+
+// ── Particles & toasts ────────────────────────────────────────────────────────
+function drawFX(){
+  particles.forEach(p=>{
+    ctx.globalAlpha=p.life; ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,Math.max(0,p.sz*p.life),0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+  toasts.forEach(t=>{
+    ctx.globalAlpha=Math.min(1,t.life*3);
+    ctx.font='bold 18px "Helvetica Neue",Arial,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillStyle=t.color; ctx.shadowColor=t.color; ctx.shadowBlur=14;
+    ctx.fillText(t.text,t.x,t.y); ctx.shadowBlur=0;
+  });
+  ctx.globalAlpha=1;
+}
+
+// ── MENU screen ───────────────────────────────────────────────────────────────
+function drawMenu(){
+  overlay(0.88);
+
+  // Floating emoji orbit
+  const tf=frame*0.026;
+  TYPES.slice(0,8).forEach((em,i)=>{
+    const a=tf+(Math.PI*2*i/8);
+    ctx.globalAlpha=0.10+Math.sin(a*1.4)*0.05;
+    ctx.font='36px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(em, W/2+Math.cos(a)*192, H/2-22+Math.sin(a)*98);
+  });
+  ctx.globalAlpha=1; ctx.textBaseline='alphabetic';
+
+  // Title — cyan → purple → cyan gradient
+  ctx.textAlign='center';
+  const tg=ctx.createLinearGradient(W/2-162,0,W/2+162,0);
+  tg.addColorStop(0,'#00e5ff'); tg.addColorStop(0.5,'#a855f7'); tg.addColorStop(1,'#00e5ff');
+  ctx.shadowColor='#00e5ff'; ctx.shadowBlur=50;
+  ctx.font='bold 66px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=tg;
+  ctx.fillText('TRIPLE',W/2,H/2-100); ctx.shadowBlur=0;
+  ctx.font='bold 40px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textHi;
+  ctx.fillText('CASCADE',W/2,H/2-54);
+
+  // Rules
+  glassPanel(W/2-234,H/2-34,468,155);
+  ctx.font='13px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textMid;
+  ctx.fillText('Tap tiles to move them into the Elimination Zone below.',W/2,H/2-12);
+  ctx.fillText('Get 3 identical tiles in the zone to eliminate them.',W/2,H/2+10);
+  ctx.font='bold 12px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.red;
+  ctx.fillText('Fill all 7 slots with no match = STAGE FAILED!',W/2,H/2+33);
+  ctx.font='11px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textLo;
+  ctx.fillText('💡 Hint [H]   ·   ↩ Undo [U]   ·   🔀 Shuffle [S]',W/2,H/2+60);
+  ctx.fillText('Clear all tiles to advance — difficulty ramps as you go',W/2,H/2+80);
+  ctx.fillStyle=C.textMid;
+  ctx.fillText('Top-layer & outer tiles are accessible first',W/2,H/2+100);
+
+  // ── Difficulty selector ─────────────────────────────────────────────────────
+  ctx.font='bold 10px "Helvetica Neue",Arial,sans-serif';
+  ctx.fillStyle=C.textLo; ctx.textAlign='center';
+  ctx.fillText('SELECT DIFFICULTY TO BEGIN',W/2,H/2+130);
+
+  getDiffButtons().forEach(b=>{
+    const cfg=DIFF[b.key];
+    const hov=hoveredDiff===b.key;
+    // Panel bg
+    ctx.fillStyle=hov?`${cfg.color}22`:`${cfg.color}11`;
+    rr(b.x,b.y,b.w,b.h,10); ctx.fill();
+    ctx.strokeStyle=hov?cfg.color:`${cfg.color}88`;
+    ctx.lineWidth=hov?2:1.5; rr(b.x,b.y,b.w,b.h,10); ctx.stroke();
+    if(hov){ ctx.shadowColor=cfg.color; ctx.shadowBlur=16; rr(b.x,b.y,b.w,b.h,10); ctx.stroke(); ctx.shadowBlur=0; }
+    // Icon
+    ctx.font='20px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='black'; ctx.fillText(cfg.icon, b.x+b.w/2, b.y+18);
+    // Label
+    ctx.font=`bold 12px "Helvetica Neue",Arial,sans-serif`; ctx.textBaseline='alphabetic';
+    ctx.fillStyle=cfg.color;
+    ctx.fillText(cfg.label, b.x+b.w/2, b.y+38);
+    // Details
+    ctx.font='9px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textLo;
+    cfg.details.forEach((d,di)=>ctx.fillText(d, b.x+b.w/2, b.y+52+di*11));
+  });
+}
+
+// ── Difficulty button layout (shared by draw + input) ─────────────────────────
+function getDiffButtons(){
+  const keys=['easy','medium','hard'];
+  const btnW=Math.min(180,Math.floor((W-80)/3));
+  const gap=Math.min(16,Math.floor((W-80-btnW*3)/2));
+  const totalW=btnW*3+gap*2;
+  const startX=W/2-totalW/2;
+  const btnY=H/2+140;
+  return keys.map((k,i)=>({ key:k, x:startX+i*(btnW+gap), y:btnY, w:btnW, h:72 }));
+}
+
+// ── DEAD screen ───────────────────────────────────────────────────────────────
+function drawDead(){
+  overlay(0.90);
+  glassPanel(W/2-188,H/2-120,376,248);
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.font='bold 12px "Helvetica Neue",Arial,sans-serif';
+  ctx.fillStyle='rgba(248,113,113,0.9)';
+  ctx.fillText('ZONE OVERFLOWED — NO MATCH',W/2,H/2-88);
+  ctx.shadowColor=C.red; ctx.shadowBlur=26;
+  ctx.font='bold 44px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.red;
+  ctx.fillText('STAGE FAILED',W/2,H/2-46); ctx.shadowBlur=0;
+  ctx.font='14px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textMid;
+  ctx.fillText(`Stage ${stageIdx+1}  ·  Stages cleared: ${stagesCleared}`,W/2,H/2-8);
+  ctx.font='bold 40px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.accent;
+  ctx.fillText(score.toLocaleString(),W/2,H/2+44);
+  ctx.font='12px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textLo;
+  ctx.fillText('final score',W/2,H/2+64);
+  const fl=Math.floor(frame/20)%2;
+  ctx.font='bold 14px "Helvetica Neue",Arial,sans-serif';
+  ctx.fillStyle=fl?C.white:'rgba(100,180,255,0.28)';
+  ctx.fillText('CLICK · SPACE TO TRY AGAIN',W/2,H/2+114);
+}
+
+// ── STAGE CLEAR screen ────────────────────────────────────────────────────────
+function drawStageClear(){
+  if(frame%3===0) burst(
+    Math.random()*W, Math.random()*(H*0.78),
+    [C.accent,C.purple,C.green,'#60a5fa','#e0f0ff'][Math.floor(Math.random()*5)],5,4
+  );
+  overlay(0.78);
+  glassPanel(W/2-216,H/2-118,432,238);
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.shadowColor=C.accent; ctx.shadowBlur=34;
+  ctx.font='bold 46px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.accent;
+  ctx.fillText('STAGE CLEAR! 🎉',W/2,H/2-64); ctx.shadowBlur=0;
+  ctx.font='bold 18px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.green;
+  ctx.fillText(`Stage ${stageIdx+1} — ${getStageConfig(stageIdx).name}`,W/2,H/2-24);
+  ctx.font='14px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textMid;
+  ctx.fillText(`Score: ${score.toLocaleString()}`,W/2,H/2+10);
+
+  // Auto-advance ring
+  const pct=1-stageClearTimer/155;
+  ctx.strokeStyle='rgba(0,229,255,0.10)'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(W/2,H/2+70,22,0,Math.PI*2); ctx.stroke();
+  ctx.shadowColor=C.accent; ctx.shadowBlur=10;
+  ctx.strokeStyle=C.accent; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(W/2,H/2+70,22,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.font='10px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textLo;
+  ctx.fillText('Next stage loading…',W/2,H/2+108);
+}
+
+// ── WIN ALL screen ────────────────────────────────────────────────────────────
+function drawWinAll(){
+  if(frame%2===0) burst(Math.random()*W,Math.random()*H,
+    [C.accent,C.purple,C.green,'#60a5fa','#e0f0ff'][Math.floor(Math.random()*5)],8,5);
+  overlay(0.82);
+  glassPanel(W/2-208,H/2-130,416,264);
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.shadowColor=C.accent; ctx.shadowBlur=46;
+  ctx.font='bold 52px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.accent;
+  ctx.fillText('YOU WIN! 🏆',W/2,H/2-82); ctx.shadowBlur=0;
+  ctx.font='bold 18px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.green;
+  ctx.fillText(`All ${DIFF[diffKey].maxStages} ${DIFF[diffKey].label} stages cleared!`,W/2,H/2-40);
+  ctx.font='bold 44px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.accent;
+  ctx.fillText(score.toLocaleString(),W/2,H/2+18);
+  ctx.font='12px "Helvetica Neue",Arial,sans-serif'; ctx.fillStyle=C.textLo;
+  ctx.fillText('final score',W/2,H/2+40);
+  const fl=Math.floor(frame/20)%2;
+  ctx.font='bold 14px "Helvetica Neue",Arial,sans-serif';
+  ctx.fillStyle=fl?C.white:'rgba(100,180,255,0.28)';
+  ctx.fillText('CLICK · SPACE TO PLAY AGAIN',W/2,H/2+106);
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+function tileAt(px,py){
+  return [...tiles]
+    .filter(t=>t.state==='idle'&&t.accessible)
+    .sort((a,b)=>b.layer-a.layer)         // top layers get priority
+    .find(t=>px>=t.x&&px<=t.x+TW&&py>=t.y&&py<=t.y+TH) || null;
+}
+
+function powerupAt(px,py){
+  if(py>HUD_H) return null;
+  const btns=[{a:'hint',x:W-180},{a:'undo',x:W-112},{a:'shuffle',x:W-44}];
+  return btns.find(b=>px>=b.x-30&&px<=b.x+30)?.a || null;
+}
+
+canvas.addEventListener('mousemove',e=>{
+  const r=canvas.getBoundingClientRect();
+  const px=(e.clientX-r.left)*(W/r.width), py=(e.clientY-r.top)*(H/r.height);
+  hoveredTile=(gstate==='PLAYING')?tileAt(px,py):null;
+  hoveredDiff=null;
+  if(gstate==='MENU'){
+    const hit=getDiffButtons().find(b=>px>=b.x&&px<=b.x+b.w&&py>=b.y&&py<=b.y+b.h);
+    hoveredDiff=hit?hit.key:null;
+  }
+  canvas.style.cursor=(hoveredTile||hoveredDiff)?'pointer':'default';
+});
+
+function handleInput(px,py){
+  if(gstate==='DEAD'||gstate==='WIN_ALL'){ startGame(); return; }
+  if(gstate==='MENU'){
+    const hit=getDiffButtons().find(b=>px>=b.x&&px<=b.x+b.w&&py>=b.y&&py<=b.y+b.h);
+    if(hit){ diffKey=hit.key; startGame(); }
+    return;
+  }
+  if(gstate==='STAGE_CLEAR'||gstate!=='PLAYING') return;
+  const pu=powerupAt(px,py);
+  if(pu==='hint')    { doHint();    return; }
+  if(pu==='undo')    { doUndo();    return; }
+  if(pu==='shuffle') { doShuffle(); return; }
+  const t=tileAt(px,py);
+  if(t) tapTile(t);
+}
+
+canvas.addEventListener('click',e=>{
+  const r=canvas.getBoundingClientRect();
+  handleInput((e.clientX-r.left)*(W/r.width),(e.clientY-r.top)*(H/r.height));
+});
+
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const r=canvas.getBoundingClientRect(), touch=e.touches[0];
+  handleInput((touch.clientX-r.left)*(W/r.width),(touch.clientY-r.top)*(H/r.height));
+},{passive:false});
+
+document.addEventListener('keydown',e=>{
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(gstate==='DEAD'||gstate==='WIN_ALL') startGame();
+    return;
+  }
+  if(gstate!=='PLAYING') return;
+  if(e.code==='KeyH') doHint();
+  if(e.code==='KeyU') doUndo();
+  if(e.code==='KeyS') doShuffle();
+});
+
+// ── Update ────────────────────────────────────────────────────────────────────
+function update(){
+  frame++;
+  updateFX();
+  if(comboTimer>0&&--comboTimer===0) combo=0;
+  if(zoneShake>0) zoneShake=Math.max(0,zoneShake-0.05);
+
+  if(gstate==='STAGE_CLEAR'){
+    if(--stageClearTimer<=0){
+      const next=stageIdx+1;
+      if(next >= DIFF[diffKey].maxStages){
+        gstate='WIN_ALL';
+      } else {
+        hints=Math.min(hints+1,5);
+        undos=Math.min(undos+1,5);
+        initStage(next);
+        gstate='PLAYING';
+      }
+    }
+  }
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────────
+function draw(){
+  // Background
+  ctx.fillStyle=C.bg; ctx.fillRect(0,0,W,H);
+
+  // Deep-space dot grid
+  ctx.fillStyle='rgba(0,229,255,0.10)';
+  for(let gx=22;gx<W;gx+=44) for(let gy=22;gy<H;gy+=44){
+    ctx.beginPath(); ctx.arc(gx,gy,1,0,Math.PI*2); ctx.fill();
+  }
+
+  // Subtle nebula glow centred on board area
+  const ng=ctx.createRadialGradient(W/2,BOARD_MID_Y,0,W/2,BOARD_MID_Y,240);
+  ng.addColorStop(0,'rgba(0,100,180,0.07)'); ng.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=ng; ctx.fillRect(0,0,W,H);
+
+  if(gstate!=='MENU'){ drawHUD(); drawBoard(); drawZone(); }
+  drawFX();
+
+  if(gstate==='MENU')        drawMenu();
+  if(gstate==='DEAD')        drawDead();
+  if(gstate==='STAGE_CLEAR') drawStageClear();
+  if(gstate==='WIN_ALL')     drawWinAll();
+}
+
+// ── Responsive resize ─────────────────────────────────────────────────────────
+// Canvas resolution = viewport size. All game coordinates use CSS pixels
+// (window.innerWidth/Height), so no coordinate transform needed.
+function resize(){
+  // Use visualViewport on iOS to get the true visible area
+  const vp = window.visualViewport;
+  W = Math.round(vp ? vp.width  : window.innerWidth);
+  H = Math.round(vp ? vp.height : window.innerHeight);
+
+  canvas.width  = W;
+  canvas.height = H;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  // Recompute H-dependent layout
+  BOARD_BOT   = H - ZONE_H;
+  BOARD_MID_Y = BOARD_TOP + (BOARD_BOT - BOARD_TOP) / 2;
+  ZONE_CY     = H - ZONE_H / 2 + 4;
+
+  // Scale zone slots to fit 7 slots on narrow (portrait) screens
+  SW = Math.max(40, Math.min(62, Math.floor((W - 48) / SLOTS) - 6));
+  SH = Math.max(38, SW - 4);
+
+  // Re-centre board tiles if a game is running
+  if(tiles.length > 0) computePositions(tiles);
+}
+
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', resize);
+} else {
+  window.addEventListener('resize', resize);
+}
+window.addEventListener('orientationchange', ()=>{ setTimeout(resize, 150); });
+resize(); // initial call — sets W, H and sizes canvas before first draw
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>

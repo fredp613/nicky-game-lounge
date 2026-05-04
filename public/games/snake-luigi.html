@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake Luigi</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a0a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+  }
+  canvas { display: block; image-rendering: pixelated; }
+  #ui {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+// ─────────────────────────────────────────────
+//  SNAKE LUIGI  —  Canvas Game Engine
+// ─────────────────────────────────────────────
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// ── Layout ──
+const TILE = 20;
+const COLS = 28;
+const ROWS = 22;
+const HUD_H = 60;
+const BOARD_W = COLS * TILE;
+const BOARD_H = ROWS * TILE;
+canvas.width  = BOARD_W;
+canvas.height = BOARD_H + HUD_H;
+
+// ── Palette ──
+const C = {
+  bg:        '#1a1a2e',
+  grid:      '#1f1f3a',
+  hudBg:     '#0d0d1a',
+  hudLine:   '#2a2a5a',
+  green1:    '#2ecc40',
+  green2:    '#27ae60',
+  green3:    '#1e8449',
+  luigiCap:  '#2e7d32',
+  luigiGold: '#f9ca24',
+  luigiSkin: '#f5cba7',
+  luigiMust: '#6d4c41',
+  red:       '#e74c3c',
+  gold:      '#f9ca24',
+  silver:    '#bdc3c7',
+  bronze:    '#cd7f32',
+  white:     '#ffffff',
+  purple:    '#9b59b6',
+  star:      '#f1c40f',
+  mushroom:  '#e74c3c',
+  coin:      '#f9ca24',
+  flower:    '#3498db',
+  textHi:    '#f9ca24',
+  textLo:    '#8899bb',
+  wall:      '#2c3e50',
+  wallLight: '#34495e',
+};
+
+// ── State ──
+let state = 'MENU';   // MENU | PLAYING | PAUSED | DEAD | WIN
+let score = 0, hiScore = 0, lives = 3, level = 1;
+let snake, dir, nextDir, food, particles, toasts, frameCount;
+let moveTimer = 0, moveInterval = 8; // frames per step
+let levelTimer = 0;
+let bonusItem = null;
+let bonusTimer = 0;
+
+// ── Food Types ──
+const FOOD_TYPES = [
+  { type:'coin',     pts:10,  color:C.coin,    size:0.5, label:'+10'  },
+  { type:'mushroom', pts:25,  color:C.mushroom, size:0.65, label:'+25' },
+  { type:'flower',   pts:50,  color:C.flower,  size:0.55, label:'+50' },
+  { type:'star',     pts:100, color:C.star,    size:0.7,  label:'+100 ★' },
+];
+
+// ── Init ──
+function initGame() {
+  const cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+  snake = [
+    { x: cx,   y: cy },
+    { x: cx-1, y: cy },
+    { x: cx-2, y: cy },
+  ];
+  dir      = { x:1, y:0 };
+  nextDir  = { x:1, y:0 };
+  food     = spawnFood();
+  particles = [];
+  toasts    = [];
+  frameCount = 0;
+  moveTimer  = 0;
+  bonusItem  = null;
+  bonusTimer = 0;
+  score  = 0;
+  lives  = 3;
+  level  = 1;
+  moveInterval = 9;
+}
+
+function spawnFood(exclude) {
+  const occupied = new Set(snake.map(s => `${s.x},${s.y}`));
+  if (bonusItem) occupied.add(`${bonusItem.x},${bonusItem.y}`);
+  let x, y;
+  do {
+    x = Math.floor(Math.random() * COLS);
+    y = Math.floor(Math.random() * ROWS);
+  } while (occupied.has(`${x},${y}`));
+  const typeIdx = Math.random() < 0.55 ? 0 : Math.random() < 0.55 ? 1 : Math.random() < 0.6 ? 2 : 3;
+  return { x, y, ...FOOD_TYPES[typeIdx], pulse: 0 };
+}
+
+function maybeSpawnBonus() {
+  if (!bonusItem && Math.random() < 0.007) {
+    const occupied = new Set(snake.map(s => `${s.x},${s.y}`));
+    occupied.add(`${food.x},${food.y}`);
+    let x, y;
+    do { x = Math.floor(Math.random() * COLS); y = Math.floor(Math.random() * ROWS); }
+    while (occupied.has(`${x},${y}`));
+    bonusItem  = { x, y, type:'1up', pts:0, color:'#ff6b9d', label:'1UP!', size:0.65 };
+    bonusTimer = 200;
+  }
+}
+
+// ── Particles ──
+function spawnParticles(tx, ty, color, count) {
+  for (let i = 0; i < count; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = 1.5 + Math.random() * 3;
+    particles.push({
+      x: tx * TILE + TILE/2,
+      y: ty * TILE + TILE/2 + HUD_H,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      life: 1,
+      decay: 0.03 + Math.random() * 0.04,
+      size: 3 + Math.random() * 4,
+      color,
+    });
+  }
+}
+
+// ── Toast ──
+function addToast(text, color) {
+  toasts.push({ text, color: color || C.textHi, life: 1, vy: -0.8 });
+}
+
+// ── Input ──
+const KEYS = { ArrowUp:1, ArrowDown:1, ArrowLeft:1, ArrowRight:1, w:1, a:1, s:1, d:1, W:1, A:1, S:1, D:1 };
+document.addEventListener('keydown', e => {
+  if (KEYS[e.key]) e.preventDefault();
+  if (state === 'MENU') { state = 'PLAYING'; return; }
+  if (state === 'DEAD') { if (lives > 0) respawn(); else { initGame(); state = 'PLAYING'; } return; }
+  if (e.key === 'p' || e.key === 'P') { state = (state === 'PAUSED') ? 'PLAYING' : 'PAUSED'; return; }
+  if (state !== 'PLAYING') return;
+
+  if ((e.key === 'ArrowUp'    || e.key==='w' || e.key==='W') && dir.y !== 1)  nextDir = {x:0, y:-1};
+  if ((e.key === 'ArrowDown'  || e.key==='s' || e.key==='S') && dir.y !== -1) nextDir = {x:0, y:1};
+  if ((e.key === 'ArrowLeft'  || e.key==='a' || e.key==='A') && dir.x !== 1)  nextDir = {x:-1, y:0};
+  if ((e.key === 'ArrowRight' || e.key==='d' || e.key==='D') && dir.x !== -1) nextDir = {x:1, y:0};
+});
+
+// ── Respawn after death ──
+function respawn() {
+  const cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
+  snake = [{ x:cx, y:cy }, { x:cx-1, y:cy }, { x:cx-2, y:cy }];
+  dir = nextDir = { x:1, y:0 };
+  moveTimer = 0;
+  state = 'PLAYING';
+}
+
+// ── Update ──
+function update() {
+  if (state !== 'PLAYING') return;
+  frameCount++;
+  food.pulse = (food.pulse + 0.08) % (Math.PI * 2);
+
+  // Bonus timer
+  if (bonusItem) {
+    bonusTimer--;
+    if (bonusTimer <= 0) bonusItem = null;
+  }
+  maybeSpawnBonus();
+
+  // Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= p.decay;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // Toasts
+  for (let i = toasts.length - 1; i >= 0; i--) {
+    const t = toasts[i];
+    t.life -= 0.018; t.vy -= 0.02;
+    if (t.life <= 0) toasts.splice(i, 1);
+  }
+
+  // Move snake
+  moveTimer++;
+  if (moveTimer < moveInterval) return;
+  moveTimer = 0;
+
+  dir = { ...nextDir };
+  const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+  // Wall collision
+  if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+    die(); return;
+  }
+
+  // Self collision
+  for (let i = 1; i < snake.length; i++) {
+    if (snake[i].x === head.x && snake[i].y === head.y) { die(); return; }
+  }
+
+  snake.unshift(head);
+
+  // Eat food?
+  let ate = false;
+  if (head.x === food.x && head.y === food.y) {
+    score += food.pts * level;
+    spawnParticles(food.x, food.y, food.color, 14);
+    addToast(food.label, food.color);
+    food = spawnFood();
+    ate = true;
+    if (score > hiScore) hiScore = score;
+    // Level up every 200 pts
+    const newLevel = Math.floor(score / 200) + 1;
+    if (newLevel > level) {
+      level = newLevel;
+      moveInterval = Math.max(4, 9 - level);
+      addToast(`LEVEL ${level}!`, C.star);
+      spawnParticles(Math.floor(COLS/2), Math.floor(ROWS/2), C.star, 30);
+    }
+  }
+
+  // Eat bonus?
+  if (bonusItem && head.x === bonusItem.x && head.y === bonusItem.y) {
+    lives = Math.min(lives + 1, 5);
+    spawnParticles(bonusItem.x, bonusItem.y, '#ff6b9d', 20);
+    addToast('1UP! ♥', '#ff6b9d');
+    bonusItem = null;
+    ate = true;
+  }
+
+  if (!ate) snake.pop();
+}
+
+function die() {
+  lives--;
+  spawnParticles(snake[0].x, snake[0].y, C.red, 25);
+  if (lives <= 0) {
+    if (score > hiScore) hiScore = score;
+    state = 'DEAD';
+  } else {
+    state = 'DEAD';
+    addToast(`${lives} LIVES LEFT`, C.red);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawHUD();
+  drawBoard();
+  drawGrid();
+  if (bonusItem) drawBonusItem();
+  drawFood();
+  drawSnake();
+  drawParticles();
+  drawToasts();
+
+  if (state === 'MENU')   drawMenu();
+  if (state === 'PAUSED') drawPause();
+  if (state === 'DEAD')   drawDead();
+}
+
+// ── HUD ──
+function drawHUD() {
+  // Background
+  ctx.fillStyle = C.hudBg;
+  ctx.fillRect(0, 0, canvas.width, HUD_H);
+  ctx.strokeStyle = C.hudLine;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, HUD_H); ctx.lineTo(canvas.width, HUD_H);
+  ctx.stroke();
+
+  // Title
+  ctx.font = 'bold 22px "Courier New"';
+  ctx.fillStyle = C.green1;
+  ctx.textAlign = 'center';
+  ctx.fillText('SNAKE LUIGI', canvas.width / 2, 22);
+
+  // Lives (hearts)
+  ctx.textAlign = 'left';
+  ctx.font = 'bold 14px "Courier New"';
+  ctx.fillStyle = C.textLo;
+  ctx.fillText('LIVES', 12, 16);
+  for (let i = 0; i < 5; i++) {
+    ctx.font = '18px Arial';
+    ctx.fillStyle = i < lives ? '#ff6b9d' : '#333355';
+    ctx.fillText('♥', 12 + i * 22, 44);
+  }
+
+  // Score
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 13px "Courier New"';
+  ctx.fillStyle = C.textLo;
+  ctx.fillText('SCORE', canvas.width / 2, 38);
+  ctx.font = 'bold 18px "Courier New"';
+  ctx.fillStyle = C.gold;
+  ctx.fillText(String(score).padStart(6, '0'), canvas.width / 2, 56);
+
+  // Level & HiScore
+  ctx.textAlign = 'right';
+  ctx.font = 'bold 13px "Courier New"';
+  ctx.fillStyle = C.textLo;
+  ctx.fillText(`LV ${level}`, canvas.width - 12, 16);
+  ctx.fillStyle = C.silver;
+  ctx.font = 'bold 11px "Courier New"';
+  ctx.fillText(`HI ${String(hiScore).padStart(6,'0')}`, canvas.width - 12, 34);
+  // Length
+  ctx.fillStyle = C.green1;
+  ctx.font = 'bold 11px "Courier New"';
+  ctx.fillText(`LEN ${snake ? snake.length : 0}`, canvas.width - 12, 52);
+}
+
+// ── Board Background ──
+function drawBoard() {
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, HUD_H, BOARD_W, BOARD_H);
+}
+
+// ── Grid dots ──
+function drawGrid() {
+  ctx.fillStyle = C.grid;
+  for (let x = 0; x < COLS; x++) {
+    for (let y = 0; y < ROWS; y++) {
+      ctx.fillRect(x * TILE + TILE/2 - 1, y * TILE + HUD_H + TILE/2 - 1, 2, 2);
+    }
+  }
+}
+
+// ── Food ──
+function drawFood() {
+  if (!food) return;
+  const fx = food.x * TILE + TILE/2;
+  const fy = food.y * TILE + TILE/2 + HUD_H;
+  const pulse = 1 + Math.sin(food.pulse) * 0.15;
+  const r = TILE * food.size * pulse / 2;
+
+  ctx.save();
+  ctx.translate(fx, fy);
+
+  if (food.type === 'coin') {
+    drawCoin(r);
+  } else if (food.type === 'mushroom') {
+    drawMushroom(r);
+  } else if (food.type === 'flower') {
+    drawFlower(r);
+  } else if (food.type === 'star') {
+    drawStar5(r, C.star, '#fff8dc');
+  }
+  ctx.restore();
+}
+
+function drawBonusItem() {
+  const flash = Math.floor(frameCount / 8) % 2;
+  if (flash) return;
+  const fx = bonusItem.x * TILE + TILE/2;
+  const fy = bonusItem.y * TILE + TILE/2 + HUD_H;
+  ctx.save();
+  ctx.translate(fx, fy);
+  // 1UP mushroom (green)
+  const r = TILE * 0.65 / 2;
+  ctx.beginPath();
+  ctx.arc(0, r*0.1, r, Math.PI, 0);
+  ctx.fillStyle = '#2ecc40';
+  ctx.fill();
+  ctx.fillRect(-r*0.7, r*0.1, r*1.4, r*0.9);
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-r*0.35, 0, r*0.2, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc( r*0.35, 0, r*0.2, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+function drawCoin(r) {
+  // Gold coin with shimmer
+  const grad = ctx.createRadialGradient(-r*0.3, -r*0.3, 0, 0, 0, r);
+  grad.addColorStop(0, '#fff176');
+  grad.addColorStop(0.5, C.gold);
+  grad.addColorStop(1, '#c8a000');
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.strokeStyle = '#a07800'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.fillStyle = '#a07800';
+  ctx.font = `bold ${r*1.2}px "Courier New"`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('$', 0, 1);
+}
+
+function drawMushroom(r) {
+  // Red cap
+  ctx.beginPath();
+  ctx.arc(0, -r*0.1, r, Math.PI, 0);
+  ctx.fillStyle = C.mushroom; ctx.fill();
+  // White spots
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-r*0.3, -r*0.4, r*0.18, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc( r*0.3, -r*0.4, r*0.18, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -r*0.7, r*0.14, 0, Math.PI*2); ctx.fill();
+  // Stem
+  ctx.fillStyle = '#f5e6c8';
+  ctx.beginPath();
+  ctx.roundRect(-r*0.55, -r*0.1, r*1.1, r*1.0, 4);
+  ctx.fill();
+  // Face
+  ctx.fillStyle = '#333';
+  ctx.beginPath(); ctx.arc(-r*0.2, r*0.35, r*0.09, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc( r*0.2, r*0.35, r*0.09, 0, Math.PI*2); ctx.fill();
+}
+
+function drawFlower(r) {
+  // Fire flower
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 - Math.PI/2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(a)*r*0.55, Math.sin(a)*r*0.55, r*0.35, 0, Math.PI*2);
+    ctx.fillStyle = i % 2 === 0 ? C.flower : '#e74c3c'; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(0, 0, r*0.35, 0, Math.PI*2);
+  ctx.fillStyle = C.gold; ctx.fill();
+}
+
+function drawStar5(r, fill, inner) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = (i * Math.PI / 5) - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : r * 0.42;
+    i === 0 ? ctx.moveTo(Math.cos(a)*rad, Math.sin(a)*rad) : ctx.lineTo(Math.cos(a)*rad, Math.sin(a)*rad);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  ctx.strokeStyle = inner; ctx.lineWidth = 1; ctx.stroke();
+}
+
+// ── Snake ──
+function drawSnake() {
+  if (!snake) return;
+  const n = snake.length;
+  for (let i = n - 1; i >= 0; i--) {
+    const seg = snake[i];
+    const x = seg.x * TILE + HUD_H * 0;
+    const y = seg.y * TILE + HUD_H;
+    const t = i / n;
+
+    if (i === 0) {
+      drawHead(seg, dir);
+    } else {
+      // Body gradient green
+      const g = Math.floor(180 - t * 60);
+      ctx.fillStyle = `rgb(20,${g},40)`;
+      // Draw with slight inset
+      ctx.fillRect(seg.x * TILE + 1, seg.y * TILE + HUD_H + 1, TILE - 2, TILE - 2);
+      // Scale pattern
+      ctx.fillStyle = `rgba(46,204,64,${0.25 + (1-t)*0.15})`;
+      ctx.beginPath();
+      ctx.arc(seg.x * TILE + TILE/2, seg.y * TILE + HUD_H + TILE/2, (TILE-4)/2, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawHead(seg, dir) {
+  const cx = seg.x * TILE + TILE/2;
+  const cy = seg.y * TILE + HUD_H + TILE/2;
+  const r = TILE / 2 - 1;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Rotate head to face direction
+  const angle = dir.x === 1 ? 0 : dir.x === -1 ? Math.PI : dir.y === -1 ? -Math.PI/2 : Math.PI/2;
+  ctx.rotate(angle);
+
+  // Head base (Luigi green)
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI*2);
+  ctx.fillStyle = C.luigiCap; ctx.fill();
+
+  // Cap brim
+  ctx.fillStyle = '#1a5c1a';
+  ctx.beginPath();
+  ctx.ellipse(r*0.3, -r*0.55, r*0.85, r*0.3, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Green cap top
+  ctx.fillStyle = C.luigiCap;
+  ctx.beginPath();
+  ctx.arc(r*0.1, -r*0.4, r*0.55, 0, Math.PI, true);
+  ctx.fill();
+
+  // "L" emblem on cap
+  ctx.fillStyle = C.luigiGold;
+  ctx.beginPath();
+  ctx.arc(r*0.1, -r*0.45, r*0.28, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = C.luigiCap;
+  ctx.font = `bold ${r*0.38}px "Courier New"`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('L', r*0.1 + 0.5, -r*0.44);
+
+  // Skin face
+  ctx.fillStyle = C.luigiSkin;
+  ctx.beginPath();
+  ctx.ellipse(r*0.1, r*0.15, r*0.52, r*0.42, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#222';
+  ctx.beginPath(); ctx.arc(-r*0.12, r*0.0, r*0.1, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.arc(-r*0.08, -r*0.02, r*0.04, 0, Math.PI*2); ctx.fill();
+
+  // Mustache
+  ctx.fillStyle = C.luigiMust;
+  ctx.beginPath();
+  ctx.ellipse(-r*0.05, r*0.28, r*0.42, r*0.14, 0.2, 0, Math.PI);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ── Particles ──
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── Toasts ──
+function drawToasts() {
+  for (const t of toasts) {
+    ctx.globalAlpha = Math.min(1, t.life * 2);
+    ctx.font = 'bold 15px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = t.color;
+    const y = canvas.height/2 + t.vy * (1 - t.life) * 200;
+    ctx.fillText(t.text, canvas.width/2, y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ── Overlay helper ──
+function drawOverlay(alpha) {
+  ctx.fillStyle = `rgba(10,5,25,${alpha})`;
+  ctx.fillRect(0, HUD_H, canvas.width, BOARD_H);
+}
+
+function drawBoxedText(lines, y0, spacing, sizes, colors) {
+  lines.forEach((line, i) => {
+    ctx.font = `bold ${sizes[i] || 16}px "Courier New"`;
+    ctx.fillStyle = colors[i] || C.white;
+    ctx.textAlign = 'center';
+    ctx.fillText(line, canvas.width/2, y0 + i * spacing);
+  });
+}
+
+// ── Menu ──
+function drawMenu() {
+  drawOverlay(0.82);
+
+  // Bouncing star logo
+  const bob = Math.sin(frameCount * 0.04) * 6;
+  ctx.save();
+  ctx.translate(canvas.width/2, HUD_H + 80 + bob);
+  drawStar5(32, C.star, '#fff');
+  ctx.restore();
+
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 32px "Courier New"';
+  ctx.fillStyle = C.green1;
+  ctx.fillText('SNAKE', canvas.width/2, HUD_H + 155);
+  ctx.fillStyle = C.luigiGold;
+  ctx.fillText('LUIGI', canvas.width/2, HUD_H + 193);
+
+  ctx.font = '14px "Courier New"';
+  ctx.fillStyle = C.textLo;
+  ctx.fillText('Collect coins, mushrooms & stars', canvas.width/2, HUD_H + 230);
+  ctx.fillText('Don\'t hit the walls or yourself!', canvas.width/2, HUD_H + 250);
+
+  const flash = Math.floor(frameCount / 20) % 2;
+  ctx.font = 'bold 16px "Courier New"';
+  ctx.fillStyle = flash ? C.white : C.textLo;
+  ctx.fillText('PRESS ANY KEY TO START', canvas.width/2, HUD_H + 305);
+
+  ctx.font = '12px "Courier New"';
+  ctx.fillStyle = C.textLo;
+  ctx.fillText('← ↑ → ↓  or  W A S D  to move   |   P to pause', canvas.width/2, HUD_H + 340);
+}
+
+// ── Pause ──
+function drawPause() {
+  drawOverlay(0.7);
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 30px "Courier New"';
+  ctx.fillStyle = C.luigiGold;
+  ctx.fillText('PAUSED', canvas.width/2, HUD_H + BOARD_H/2 - 20);
+  ctx.font = '15px "Courier New"';
+  ctx.fillStyle = C.textLo;
+  ctx.fillText('Press P to resume', canvas.width/2, HUD_H + BOARD_H/2 + 20);
+}
+
+// ── Dead / Game Over ──
+function drawDead() {
+  drawOverlay(0.8);
+  ctx.textAlign = 'center';
+
+  if (lives > 0) {
+    ctx.font = 'bold 26px "Courier New"';
+    ctx.fillStyle = C.red;
+    ctx.fillText('MAMA MIA!', canvas.width/2, HUD_H + BOARD_H/2 - 40);
+    ctx.font = '15px "Courier New"';
+    ctx.fillStyle = C.white;
+    ctx.fillText(`${lives} ${lives===1?'life':'lives'} remaining`, canvas.width/2, HUD_H + BOARD_H/2);
+    const flash = Math.floor(frameCount/18) % 2;
+    ctx.font = 'bold 14px "Courier New"';
+    ctx.fillStyle = flash ? C.white : C.textLo;
+    ctx.fillText('PRESS ANY KEY TO CONTINUE', canvas.width/2, HUD_H + BOARD_H/2 + 50);
+  } else {
+    ctx.font = 'bold 28px "Courier New"';
+    ctx.fillStyle = C.red;
+    ctx.fillText('GAME OVER', canvas.width/2, HUD_H + BOARD_H/2 - 55);
+    ctx.font = '16px "Courier New"';
+    ctx.fillStyle = C.luigiGold;
+    ctx.fillText(`SCORE: ${score}`, canvas.width/2, HUD_H + BOARD_H/2 - 15);
+    ctx.fillStyle = C.silver;
+    ctx.fillText(`BEST:  ${hiScore}`, canvas.width/2, HUD_H + BOARD_H/2 + 15);
+    if (score === hiScore && score > 0) {
+      ctx.fillStyle = C.star;
+      ctx.font = 'bold 14px "Courier New"';
+      ctx.fillText('★  NEW HIGH SCORE!  ★', canvas.width/2, HUD_H + BOARD_H/2 + 45);
+    }
+    const flash = Math.floor(frameCount/18) % 2;
+    ctx.font = 'bold 14px "Courier New"';
+    ctx.fillStyle = flash ? C.white : C.textLo;
+    ctx.fillText('PRESS ANY KEY TO RESTART', canvas.width/2, HUD_H + BOARD_H/2 + 80);
+  }
+}
+
+// ── Game Loop ──
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ── Boot ──
+initGame();
+state = 'MENU';
+loop();
+</script>
+</body>
+</html>

@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ottawa Heat</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; font-family:'Courier New',monospace; }
+canvas { display:block; cursor:crosshair; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+'use strict';
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 800, H = 560;
+canvas.width = W; canvas.height = H;
+
+// ── WORLD ─────────────────────────────────────────
+const T  = 32;           // tile px
+const MW = 60, MH = 60; // map tiles  → 1920×1920 world
+const WW = MW*T, WH = MH*T;
+
+// Tile types
+const RD=0, SW=1, BL=2, PK=3, WA=4;
+
+// ── PALETTE ───────────────────────────────────────
+const BCOLORS=['#3a3028','#283038','#303828','#382830','#283030',
+               '#302838','#3a3830','#303a28','#383028','#2e3420'];
+const CAR_COL =['#c0392b','#2980b9','#27ae60','#f39c12','#8e44ad',
+                '#16a085','#d35400','#2c3e50','#7f8c8d','#e67e22',
+                '#1abc9c','#9b59b6','#f1c40f','#e74c3c','#3498db'];
+const SKIN='#f5cba7';
+
+// ── MAP ───────────────────────────────────────────
+const map=[];
+function buildMap(){
+  for(let y=0;y<MH;y++){
+    map[y]=[];
+    for(let x=0;x<MW;x++) map[y][x]=calcTile(x,y);
+  }
+}
+function calcTile(x,y){
+  const bx=x%10, by=y%10;
+  const BX=Math.floor(x/10), BY=Math.floor(y/10);
+  if(bx<=1||by<=1) return RD;
+  if(bx===2||bx===9||by===2||by===9) return SW;
+  // Parliament Hill
+  if(BX===0&&BY===0) return PK;
+  // Major's Hill Park
+  if(BX===4&&BY===0) return PK;
+  // Confederation Park
+  if(BX===2&&BY===1) return PK;
+  // LeBreton Flats
+  if(BX===0&&BY===2) return PK;
+  // Rideau River
+  if(y>=24&&y<=26) return WA;
+  // Dow's Lake patch
+  if(BX===0&&BY===4&&bx>3&&by>3) return WA;
+  return BL;
+}
+function tileAt(tx,ty){ return (tx<0||ty<0||tx>=MW||ty>=MH)?BL:map[ty][tx]; }
+function tileAtPx(px,py){ return tileAt(Math.floor(px/T),Math.floor(py/T)); }
+function walkable(px,py){const t=tileAtPx(px,py); return t===RD||t===SW||t===PK;}
+function drivable(px,py){return tileAtPx(px,py)===RD;}
+function bldgCol(tx,ty){return BCOLORS[(tx*3+ty*7)%BCOLORS.length];}
+
+// ── AREA LABELS ───────────────────────────────────
+const LABELS=[
+  {t:'Parliament Hill', x:100,  y:100,  c:'#69f0ae'},
+  {t:'ByWard Market',   x:1420, y:90,   c:'#ef9a9a'},
+  {t:'Centretown',      x:570,  y:420,  c:'#e0e0e0'},
+  {t:'Sandy Hill',      x:1330, y:420,  c:'#ce93d8'},
+  {t:'Rideau River',    x:800,  y:800,  c:'#4fc3f7'},
+  {t:'The Glebe',       x:180,  y:1350, c:'#a5d6a7'},
+  {t:'Old Ottawa East', x:1380, y:1380, c:'#ffcc80'},
+  {t:'LeBreton Flats',  x:90,   y:700,  c:'#cfd8dc'},
+  {t:'Lowertown',       x:1100, y:580,  c:'#80cbc4'},
+  {t:'Bank Street ↓',   x:315,  y:1100, c:'#fff9c4'},
+];
+
+// ── GANGS ─────────────────────────────────────────
+const GANGS=[
+  {id:0,name:'Glebe Crew',    col:'#2ecc40',dark:'#1a8a2a',
+   turf:(px,py)=>py>1080&&px<720},
+  {id:1,name:'ByWard Bosses', col:'#e74c3c',dark:'#a93226',
+   turf:(px,py)=>px>960&&py<700},
+  {id:2,name:'Rideau Runners',col:'#3498db',dark:'#1f6da0',
+   turf:(px,py)=>px>1180&&py>680},
+];
+function gangAt(px,py){for(const g of GANGS)if(g.turf(px,py))return g;return null;}
+
+// ── WEAPONS ───────────────────────────────────────
+const WEAPONS=[
+  {id:0,name:'Fists',  dmg:20,range:36, rof:28,spread:0,   pellets:1,cost:0},
+  {id:1,name:'Pistol', dmg:32,range:480,rof:16,spread:0.05,pellets:1,cost:200},
+  {id:2,name:'Shotgun',dmg:22,range:200,rof:52,spread:0.28,pellets:5,cost:500},
+  {id:3,name:'SMG',    dmg:16,range:380,rof:4, spread:0.1, pellets:1,cost:1000},
+];
+
+// ── POIs ──────────────────────────────────────────
+const GUN_SHOP={px:992, py:322, r:38, name:"Viktor's Arms"};
+const HOSPITAL ={px:130, py:355, r:38, name:'Ottawa General'};
+const BOOTHS=[
+  {px:322, py:355, gangId:0, name:'Glebe Crew Line',      mid:0},
+  {px:1282,py:355, gangId:1, name:'ByWard Bosses Line',   mid:1},
+  {px:322, py:1282,gangId:2, name:'Rideau Runners Line',  mid:2},
+  {px:962, py:962, gangId:-1,name:'Anonymous Tip Line',   mid:3},
+];
+
+// ── MISSIONS ──────────────────────────────────────
+const MISSIONS=[
+  {id:0,gang:0,title:'Glebe Package Run',
+   desc:['Pick up the package on Bank St,','then deliver it to the Glebe drop point.'],
+   reward:400,
+   steps:[
+     {type:'goto',   px:322,  py:1122, desc:'Collect package on Bank St',  col:'#2ecc40'},
+     {type:'goto',   px:162,  py:1442, desc:'Deliver to Glebe drop point', col:'#2ecc40'},
+   ]},
+  {id:1,gang:1,title:'Market Heist Wheels',
+   desc:['Steal a car from Lowertown', 'and bring it to the ByWard garage.'],
+   reward:500,
+   steps:[
+     {type:'getcar', px:1122, py:642,  desc:'Steal a car in Lowertown',    col:'#e74c3c'},
+     {type:'deliver',px:1282, py:162,  desc:'Deliver car to ByWard garage',col:'#e74c3c'},
+   ]},
+  {id:2,gang:2,title:'East End Elimination',
+   desc:['Take out the rival boss in East Ottawa.','Then get to the safe house.'],
+   reward:600,
+   steps:[
+     {type:'kill',   px:1442, py:962,  desc:'Eliminate the rival boss',    col:'#3498db'},
+     {type:'escape', px:962,  py:642,  desc:'Escape to the safe house',    col:'#3498db'},
+   ]},
+  {id:3,gang:-1,title:'Mystery Courier',
+   desc:['Collect 4 anonymous briefcases', 'scattered across Ottawa.'],
+   reward:800,
+   steps:[
+     {type:'collect',px:642,  py:322,  desc:'Briefcase 1 – Centretown',    col:'#f9ca24'},
+     {type:'collect',px:1282, py:962,  desc:'Briefcase 2 – Sandy Hill',    col:'#f9ca24'},
+     {type:'collect',px:322,  py:962,  desc:'Briefcase 3 – LeBreton',      col:'#f9ca24'},
+     {type:'collect',px:1282, py:1282, desc:'Briefcase 4 – East Ottawa',   col:'#f9ca24'},
+   ]},
+];
+
+// ── STATE ─────────────────────────────────────────
+let gs='PLAYING'; // PLAYING DEAD SHOP BRIEF
+let player, cam={x:0,y:0};
+let cars=[], bullets=[], npcs=[], cops=[], gangers=[], particles=[];
+let wanted=0, wantedTimer=0, wantedCool=0, copSpawnT=0;
+let mission=null, mStep=0, mKillTarget=null;
+let shopTab=0, shopKeyT=0;
+let toastMsg='', toastTimer=0;
+let nearPrompt='';
+let fc=0; // frameCount
+
+// ── INIT ──────────────────────────────────────────
+function initGame(){
+  buildMap();
+  player={
+    px:322,py:322, angle:0, health:100, maxHealth:100,
+    money:750, weapons:[0], ammo:[1/0,0,0,0], weapIdx:0,
+    shotT:0, inCar:null, dead:false, invT:0,
+    kills:0, doneMissions:[],
+  };
+  cam={x:0,y:0};
+  cars=[]; bullets=[]; npcs=[]; cops=[]; gangers=[]; particles=[];
+  wanted=0; wantedTimer=0; wantedCool=0; copSpawnT=0;
+  mission=null; mStep=0; mKillTarget=null;
+  toastMsg=''; toastTimer=0; nearPrompt=''; fc=0;
+  spawnCars(); spawnGangers(); spawnCivs();
+}
+
+// ── SPAWN ─────────────────────────────────────────
+function spawnCars(){
+  const spots=[
+    {px:642,py:322},{px:1282,py:322},{px:322,py:642},
+    {px:962,py:642},{px:1282,py:642},{px:322,py:1282},
+    {px:642,py:962},{px:962,py:1282},{px:1602,py:642},
+    {px:1602,py:962},{px:642,py:1602},{px:962,py:1602},
+    {px:322,py:1602},{px:1282,py:1282},{px:1602,py:1282},
+  ];
+  cars=spots.map((s,i)=>mkCar(s.px,s.py,CAR_COL[i%CAR_COL.length],false));
+}
+
+function mkCar(px,py,col,isCop){
+  return {px,py,angle:0,speed:0,maxSpeed:isCop?6.2:5.5,
+    accel:0.2,friction:0.87,steer:0.058,
+    health:100,color:col,driver:null,isCop:!!isCop,
+    id:Math.random()};
+}
+
+function spawnGangers(){
+  GANGS.forEach(g=>{
+    for(let i=0;i<6;i++){
+      let px,py,tries=0;
+      do{ px=80+Math.random()*1760; py=80+Math.random()*1760; tries++; }
+      while((!g.turf(px,py)||!walkable(px,py))&&tries<80);
+      gangers.push({px,py,angle:Math.random()*Math.PI*2,
+        gang:g.id,color:g.col,health:50,maxHealth:50,
+        shotT:0,alertT:0,invT:0,state:'patrol',type:'gang',id:Math.random()});
+    }
+  });
+}
+
+function spawnCivs(){
+  for(let i=0;i<12;i++){
+    let px,py,tries=0;
+    do{ px=100+Math.random()*1720; py=100+Math.random()*1720; tries++; }
+    while(!walkable(px,py)&&tries<60);
+    const c='#'+Math.floor(Math.random()*0x888888+0x444444).toString(16).padStart(6,'0');
+    npcs.push({px,py,angle:Math.random()*Math.PI*2,health:30,
+      speed:0.85,color:c,state:'wander',timer:Math.random()*100,type:'civ',invT:0});
+  }
+}
+
+function spawnCop(){
+  const a=Math.random()*Math.PI*2, d=400+Math.random()*200;
+  let px=clamp(player.px+Math.cos(a)*d,60,WW-60);
+  let py=clamp(player.py+Math.sin(a)*d,60,WH-60);
+  const onFoot=wanted<3||Math.random()<0.35;
+  const car=onFoot?null:mkCar(px,py,'#0a0acc',true);
+  if(car) cars.push(car);
+  const c={px,py,angle:0,health:60,maxHealth:60,
+    speed:1.9+wanted*0.25,shotT:0,invT:0,type:'cop',state:'chase',car,id:Math.random()};
+  if(car) car.driver=c;
+  cops.push(c);
+}
+
+function spawnMissionTarget(px,py){
+  const t={px,py,angle:0,health:90,maxHealth:90,
+    shotT:0,invT:0,type:'target',color:'#ff6b35',
+    gang:-1,state:'attack',id:Math.random()};
+  gangers.push(t); return t;
+}
+
+// ── INPUT ─────────────────────────────────────────
+const keys={};
+let mx=W/2, my=H/2, mdown=false;
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(e.code==='Tab') e.preventDefault();
+  if(gs==='DEAD'&&e.code==='Space'){respawn();return;}
+  if(gs==='BRIEF'){
+    if(e.code==='Space'&&mission){gs='PLAYING';return;}
+    if(e.code==='Escape'){mission=null;gs='PLAYING';return;}
+    return;
+  }
+  if(gs==='SHOP'){
+    if(e.code==='Escape'||e.code==='KeyQ'){gs='PLAYING';return;}
+    return;
+  }
+  if(gs!=='PLAYING') return;
+  if(e.code==='KeyE') doCarToggle();
+  if(e.code==='KeyF') doInteract();
+  if(e.code==='Tab')  cycleWep(1);
+  if(e.code==='Digit1') setWep(0);
+  if(e.code==='Digit2') setWep(1);
+  if(e.code==='Digit3') setWep(2);
+  if(e.code==='Digit4') setWep(3);
+  if(e.code==='KeyQ'&&shopTab>=0){ gs='PLAYING'; }
+});
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
+canvas.addEventListener('mousemove',e=>{
+  const r=canvas.getBoundingClientRect();
+  mx=(e.clientX-r.left); my=(e.clientY-r.top);
+});
+canvas.addEventListener('mousedown',e=>{if(e.button===0)mdown=true;});
+canvas.addEventListener('mouseup',  e=>{if(e.button===0)mdown=false;});
+
+function setWep(i){if(i<player.weapons.length)player.weapIdx=i;}
+function cycleWep(d){player.weapIdx=(player.weapIdx+d+player.weapons.length)%player.weapons.length;}
+
+// ── INTERACT ──────────────────────────────────────
+function doCarToggle(){
+  if(player.inCar){
+    // Exit
+    const c=player.inCar;
+    player.px=c.px+Math.cos(c.angle+Math.PI/2)*42;
+    player.py=c.py+Math.sin(c.angle+Math.PI/2)*42;
+    if(!walkable(player.px,player.py)){player.px=c.px+50;player.py=c.py;}
+    c.driver=null; player.inCar=null;
+  } else {
+    let best=null, bestD=80*80;
+    for(const c of cars){
+      if(c.driver) continue;
+      const d=d2(c,player);
+      if(d<bestD){bestD=d;best=c;}
+    }
+    if(best){
+      best.driver=player; player.inCar=best;
+      addWanted(1); toast('Car jacked! 🚗');
+    }
+  }
+}
+
+function doInteract(){
+  if(gs==='SHOP'){gs='PLAYING';return;}
+  // Gun shop
+  if(d2(player,GUN_SHOP)<GUN_SHOP.r*GUN_SHOP.r){shopTab=0;gs='SHOP';return;}
+  // Hospital
+  if(d2(player,HOSPITAL)<HOSPITAL.r*HOSPITAL.r){
+    if(player.money>=50){player.money-=50;player.health=player.maxHealth;toast('Healed! -$50');}
+    else toast('Need $50 to heal');
+    return;
+  }
+  // Phone booths
+  for(const b of BOOTHS){
+    if(d2(player,b)<42*42){
+      if(player.doneMissions.includes(b.mid)){toast('Mission done!');return;}
+      if(mission&&mission.id===b.mid){toast('Mission in progress!');return;}
+      mission=MISSIONS[b.mid]; mStep=0; mKillTarget=null;
+      if(b.mid===2) mKillTarget=spawnMissionTarget(1442,962);
+      gs='BRIEF'; return;
+    }
+  }
+}
+
+function buyWep(wIdx){
+  const w=WEAPONS[wIdx]; if(!w.cost) return;
+  const owned=player.weapons.includes(wIdx);
+  const cost=owned?100:w.cost;
+  if(player.money<cost){toast('Not enough cash!');return;}
+  player.money-=cost;
+  if(!owned){player.weapons.push(wIdx); player.weapIdx=player.weapons.indexOf(wIdx);}
+  const refill=[0,40,20,60];
+  player.ammo[wIdx]+=refill[wIdx];
+  toast(owned?'+Ammo for '+w.name:'Got '+w.name+'!');
+}
+
+// ── HELPERS ───────────────────────────────────────
+function d2(a,b){return(a.px-b.px)**2+(a.py-b.py)**2;}
+function dist(a,b){return Math.sqrt(d2(a,b));}
+function ang2(a,b){return Math.atan2(b.py-a.py,b.px-a.px);}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function addWanted(n){wanted=Math.min(5,wanted+n);wantedTimer=600+wanted*300;wantedCool=0;}
+function toast(t){toastMsg=t;toastTimer=200;}
+
+function moveE(e,dx,dy){
+  const nx=e.px+dx;
+  if(walkable(nx,e.py)||walkable(nx,e.py-10)||walkable(nx,e.py+10))
+    e.px=clamp(nx,8,WW-8);
+  const ny=e.py+dy;
+  if(walkable(e.px,ny)||walkable(e.px-10,ny)||walkable(e.px+10,ny))
+    e.py=clamp(ny,8,WH-8);
+}
+
+// ── COMBAT ────────────────────────────────────────
+function shoot(shooter,tx,ty,wep,team){
+  if(wep.id===0){ // fists
+    const a=Math.atan2(ty-shooter.py,tx-shooter.px);
+    const hx=shooter.px+Math.cos(a)*28, hy=shooter.py+Math.sin(a)*28;
+    pBurst(hx,hy,'#f9ca24',4);
+    const targets=team==='player'?[...cops,...gangers,...npcs]:[player];
+    for(const t of targets){
+      if(!t||t.state==='dead'||t.dead) continue;
+      if(dist({px:hx,py:hy},t)<32){dmg(t,wep.dmg,team);break;}
+    }
+    return;
+  }
+  const a0=Math.atan2(ty-shooter.py,tx-shooter.px);
+  for(let i=0;i<wep.pellets;i++){
+    const a=a0+(Math.random()-0.5)*wep.spread;
+    bullets.push({px:shooter.px,py:shooter.py,
+      vx:Math.cos(a)*13,vy:Math.sin(a)*13,
+      dmg:wep.dmg,team,range:wep.range,traveled:0});
+  }
+}
+
+function dmg(e,amount,from){
+  if(e.invT>0) return;
+  e.health-=amount; e.invT=20;
+  pBurst(e.px,e.py,'#ff3d71',5);
+  if(e===player){
+    if(player.health<=0&&!player.dead){player.dead=true;gs='DEAD';}
+    return;
+  }
+  if(e.health<=0){
+    e.state='dead';
+    if(e.type==='cop'&&from==='player'){addWanted(2);player.kills++;player.money+=30;}
+    if((e.type==='gang'||e.type==='target')&&from==='player'){
+      player.kills++;player.money+=50;pBurst(e.px,e.py,'#f9ca24',8);
+      if(mission&&mStep<mission.steps.length&&mission.steps[mStep].type==='kill'&&e===mKillTarget){
+        mStep++; toast('Target down! Now escape!');
+      }
+    }
+    if(e.type==='civ'&&from==='player') addWanted(2);
+  }
+}
+
+function pBurst(px,py,col,n){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2,s=1+Math.random()*3;
+    particles.push({px,py,vx:Math.cos(a)*s,vy:Math.sin(a)*s,
+      life:1,decay:0.04+Math.random()*0.04,r:2+Math.random()*3,col});
+  }
+}
+
+// ── RESPAWN ───────────────────────────────────────
+function respawn(){
+  player.health=65;player.dead=false;
+  player.px=HOSPITAL.px;player.py=HOSPITAL.py+50;
+  player.inCar=null;player.invT=240;
+  wanted=Math.max(0,wanted-1);gs='PLAYING';
+}
+
+// ── AI ────────────────────────────────────────────
+function updateCops(){
+  for(const cop of cops){
+    if(cop.state==='dead') continue;
+    if(cop.invT>0) cop.invT--;
+    if(cop.shotT>0) cop.shotT--;
+    const d=dist(cop,player);
+
+    if(cop.car&&cop.car.driver===cop){
+      const ca=cop.car;
+      const ta=ang2(ca,player);
+      const diff=ta-ca.angle;
+      const da=Math.atan2(Math.sin(diff),Math.cos(diff));
+      ca.angle+=Math.sign(da)*Math.min(Math.abs(da),0.08)*Math.min(1,Math.abs(ca.speed)/2);
+      ca.speed=Math.min(ca.maxSpeed,ca.speed+ca.accel);
+      ca.px=clamp(ca.px+Math.sin(ca.angle)*ca.speed,20,WW-20);
+      ca.py=clamp(ca.py-Math.cos(ca.angle)*ca.speed,20,WH-20);
+      cop.px=ca.px; cop.py=ca.py;
+      if(d<180&&wanted>=2){ca.driver=null;cop.car=null;}
+    } else {
+      if(d>700) continue;
+      const ta=ang2(cop,player); cop.angle=ta;
+      moveE(cop,Math.cos(ta)*cop.speed,Math.sin(ta)*cop.speed);
+      if(d<360&&wanted>=2&&cop.shotT<=0){
+        shoot(cop,player.px,player.py,WEAPONS[1],'cop');
+        cop.shotT=45+Math.random()*20;
+      }
+      if(d<32&&cop.shotT<=0){dmg(player,15,'cop');cop.shotT=40;}
+    }
+  }
+}
+
+function updateGangers(){
+  for(const gm of gangers){
+    if(gm.state==='dead') continue;
+    if(gm.invT>0) gm.invT--;
+    if(gm.shotT>0) gm.shotT--;
+    const d=dist(gm,player);
+    const myGang=gm.gang>=0?GANGS[gm.gang]:null;
+    const inTurf=myGang&&myGang.turf(player.px,player.py);
+    if(gm.type==='target'||gm.state==='attack') gm.state='attack';
+    else if(d<220&&inTurf) gm.state='attack';
+    else if(d>450) gm.state='patrol';
+
+    if(gm.state==='patrol'){
+      gm.alertT=(gm.alertT||0)-1;
+      if(gm.alertT<=0){gm.angle=Math.random()*Math.PI*2;gm.alertT=60+Math.random()*100;}
+      moveE(gm,Math.cos(gm.angle)*0.7,Math.sin(gm.angle)*0.7);
+    } else {
+      const ta=ang2(gm,player); gm.angle=ta;
+      if(d>55) moveE(gm,Math.cos(ta)*1.4,Math.sin(ta)*1.4);
+      if(d<300&&gm.shotT<=0&&player.weapons.length>1){
+        shoot(gm,player.px,player.py,WEAPONS[1],'gang');
+        gm.shotT=65+Math.random()*25;
+      }
+      if(d<32&&gm.shotT<=0){dmg(player,10,'gang');gm.shotT=45;}
+    }
+  }
+}
+
+function updateCivs(){
+  for(const n of npcs){
+    if(n.state==='dead') continue;
+    if(wanted>0&&dist(n,player)<180){
+      const fa=ang2(player,n); n.angle=fa;
+      moveE(n,Math.cos(fa)*1.8,Math.sin(fa)*1.8);
+    } else {
+      n.timer=(n.timer||0)-1;
+      if(n.timer<=0){n.angle=Math.random()*Math.PI*2;n.timer=60+Math.random()*120;}
+      moveE(n,Math.cos(n.angle)*n.speed,Math.sin(n.angle)*n.speed);
+    }
+  }
+}
+
+// ── PLAYER UPDATE ─────────────────────────────────
+function updatePlayer(){
+  if(player.dead) return;
+  if(player.invT>0) player.invT--;
+  if(player.shotT>0) player.shotT--;
+
+  const wmx=cam.x+mx, wmy=cam.y+my;
+  player.angle=Math.atan2(wmy-player.py,wmx-player.px);
+
+  if(player.inCar){
+    updateCarDrive(player.inCar);
+    player.px=player.inCar.px; player.py=player.inCar.py;
+  } else {
+    let dx=0,dy=0;
+    if(keys['ArrowLeft']||keys['KeyA']) dx-=1;
+    if(keys['ArrowRight']||keys['KeyD']) dx+=1;
+    if(keys['ArrowUp']||keys['KeyW'])   dy-=1;
+    if(keys['ArrowDown']||keys['KeyS']) dy+=1;
+    if(dx||dy){
+      const l=Math.sqrt(dx*dx+dy*dy);
+      const spd=(keys['ShiftLeft']||keys['ShiftRight'])?3.8:2.6;
+      moveE(player,(dx/l)*spd,(dy/l)*spd);
+    }
+  }
+
+  const wep=WEAPONS[player.weapons[player.weapIdx]];
+  if(mdown&&player.shotT<=0){
+    if(wep.id===0||player.ammo[wep.id]>0){
+      if(wep.id!==0) player.ammo[wep.id]--;
+      shoot(player,wmx,wmy,wep,'player');
+      player.shotT=wep.rof;
+    } else toast('Out of ammo! [F] buy more');
+  }
+
+  // Slow heal
+  if(fc%200===0&&player.health<player.maxHealth&&wanted===0)
+    player.health=Math.min(player.maxHealth,player.health+3);
+
+  // Proximity prompt
+  nearPrompt='';
+  if(d2(player,GUN_SHOP)<GUN_SHOP.r*GUN_SHOP.r)      nearPrompt="[F] Viktor's Arms";
+  else if(d2(player,HOSPITAL)<HOSPITAL.r*HOSPITAL.r)  nearPrompt='[F] Heal ($50)';
+  else {
+    for(const b of BOOTHS)
+      if(d2(player,b)<42*42){nearPrompt='[F] '+b.name; break;}
+  }
+  if(!player.inCar){
+    for(const c of cars)
+      if(!c.driver&&d2(c,player)<62*62){nearPrompt='[E] Steal car'; break;}
+  } else nearPrompt='[E] Exit car';
+}
+
+function updateCarDrive(car){
+  let throttle=0,steer=0;
+  if(keys['ArrowUp']||keys['KeyW'])    throttle=1;
+  if(keys['ArrowDown']||keys['KeyS'])  throttle=-0.5;
+  if(keys['ArrowLeft']||keys['KeyA'])  steer=-1;
+  if(keys['ArrowRight']||keys['KeyD']) steer=1;
+  car.speed=clamp(car.speed+throttle*car.accel-car.speed*0.08,-car.maxSpeed*0.4,car.maxSpeed);
+  car.speed*=car.friction;
+  if(Math.abs(car.speed)>0.4) car.angle+=steer*car.steer*(car.speed>0?1:-1);
+  const nx=car.px+Math.sin(car.angle)*car.speed;
+  const ny=car.py-Math.cos(car.angle)*car.speed;
+  if(drivable(nx,car.py)||drivable(nx,car.py-18)||drivable(nx,car.py+18))
+    car.px=clamp(nx,20,WW-20);
+  else car.speed*=-0.35;
+  if(drivable(car.px,ny)||drivable(car.px-12,ny)||drivable(car.px+12,ny))
+    car.py=clamp(ny,20,WH-20);
+  else car.speed*=-0.35;
+}
+
+// ── WANTED ────────────────────────────────────────
+function updateWanted(){
+  if(!wanted) return;
+  wantedTimer>0?wantedTimer--:(wantedCool++,wantedCool>350&&(wanted=Math.max(0,wanted-1),wantedCool=0,wantedTimer=wanted?420:0));
+  copSpawnT--;
+  if(copSpawnT<=0&&cops.filter(c=>c.state!=='dead').length<wanted*2){
+    copSpawnT=200; spawnCop();
+  }
+}
+
+// ── BULLETS ───────────────────────────────────────
+function updateBullets(){
+  outer: for(let i=bullets.length-1;i>=0;i--){
+    const b=bullets[i];
+    b.px+=b.vx; b.py+=b.vy; b.traveled+=Math.hypot(b.vx,b.vy);
+    if(b.traveled>b.range||tileAtPx(b.px,b.py)===BL){
+      pBurst(b.px,b.py,'#888',3); bullets.splice(i,1); continue;
+    }
+    const tgts=b.team==='player'?[...cops,...gangers,...npcs]:[player];
+    for(const t of tgts){
+      if(!t||t.state==='dead'||t.dead) continue;
+      if(dist(b,t)<14){
+        dmg(t,b.dmg,b.team); bullets.splice(i,1); continue outer;
+      }
+    }
+  }
+}
+
+// ── MISSIONS ──────────────────────────────────────
+function updateMission(){
+  if(!mission) return;
+  if(mStep>=mission.steps.length){
+    player.money+=mission.reward;
+    player.doneMissions.push(mission.id);
+    toast('Mission complete! +$'+mission.reward+' 🎉');
+    mission=null; mStep=0; mKillTarget=null; return;
+  }
+  const step=mission.steps[mStep];
+  const d=dist(player,{px:step.px,py:step.py});
+
+  if(step.type==='goto'||step.type==='escape'||step.type==='collect'){
+    if(d<65){
+      pBurst(step.px,step.py,'#f9ca24',14);
+      if(step.type==='collect') pBurst(step.px,step.py,'#fff',6);
+      mStep++;
+      if(mStep<mission.steps.length) toast(mission.steps[mStep].desc);
+    }
+  }
+  if(step.type==='deliver'){
+    if(!player.inCar){nearPrompt='Get in a stolen car first!';return;}
+    if(d<65){
+      pBurst(step.px,step.py,'#f9ca24',14);
+      player.inCar.driver=null; player.inCar=null;
+      player.px+=55; player.py+=30;
+      mStep++;
+      if(mStep<mission.steps.length) toast(mission.steps[mStep].desc);
+    }
+  }
+  if(step.type==='getcar'){
+    if(player.inCar&&d2(step,{px:step.px,py:step.py})<120*120) mStep++;
+    else if(!player.inCar&&d<120) toast('Steal a car near here! [E]');
+    // Just need to be in any car near the target zone
+    if(player.inCar){mStep++;toast(mission.steps[mStep]?.desc||'Now deliver it!');}
+  }
+  // 'kill' step is handled in dmg()
+}
+
+// ── CAMERA ────────────────────────────────────────
+function updateCam(){
+  cam.x+=((player.px-W/2)-cam.x)*0.1;
+  cam.y+=((player.py-H/2)-cam.y)*0.1;
+  cam.x=clamp(cam.x,0,WW-W); cam.y=clamp(cam.y,0,WH-H);
+}
+
+function updateParticles(){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.px+=p.vx; p.py+=p.vy; p.vy+=0.09; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+
+// ═══════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════
+
+function drawWorld(){
+  ctx.save(); ctx.translate(-cam.x,-cam.y);
+  drawMap(); drawPOIs(); drawLabels();
+  drawCars(); drawBullets();
+  drawNPCList(npcs,'civ');
+  drawNPCList(gangers,'gang');
+  drawNPCList(cops,'cop');
+  drawPlayer(); drawParticles(); drawMissionMarkers();
+  ctx.restore();
+}
+
+// ── MAP ───────────────────────────────────────────
+function drawMap(){
+  const tx0=Math.max(0,Math.floor(cam.x/T)-1);
+  const ty0=Math.max(0,Math.floor(cam.y/T)-1);
+  const tx1=Math.min(MW,tx0+Math.ceil(W/T)+2);
+  const ty1=Math.min(MH,ty0+Math.ceil(H/T)+2);
+  for(let ty=ty0;ty<ty1;ty++){
+    for(let tx=tx0;tx<tx1;tx++){
+      const tile=map[ty][tx];
+      const px=tx*T,py=ty*T;
+      switch(tile){
+        case RD:
+          ctx.fillStyle='#1a1a1e';ctx.fillRect(px,py,T,T);
+          // Lane markings
+          ctx.strokeStyle='rgba(70,70,70,0.5)';ctx.lineWidth=1;ctx.setLineDash([5,7]);
+          if(tx%10===0){ctx.beginPath();ctx.moveTo(px+T/2,py);ctx.lineTo(px+T/2,py+T);ctx.stroke();}
+          if(ty%10===0){ctx.beginPath();ctx.moveTo(px,py+T/2);ctx.lineTo(px+T,py+T/2);ctx.stroke();}
+          ctx.setLineDash([]);
+          // Crosswalk stripes at intersections
+          if(tx%10<=1&&ty%10<=1){
+            ctx.fillStyle='rgba(255,255,255,0.06)';
+            for(let s=0;s<T;s+=6)ctx.fillRect(px+s,py,3,T);
+          }
+          break;
+        case SW:
+          ctx.fillStyle='#28282e';ctx.fillRect(px,py,T,T);
+          ctx.fillStyle='rgba(255,255,255,0.025)';
+          for(let s=0;s<T;s+=8){ctx.fillRect(px+s,py,1,T);ctx.fillRect(px,py+s,T,1);}
+          break;
+        case BL:
+          ctx.fillStyle=bldgCol(tx,ty);ctx.fillRect(px,py,T,T);
+          ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(px,py,T,2);ctx.fillRect(px,py,2,T);
+          ctx.fillStyle='rgba(255,255,255,0.035)';ctx.fillRect(px,py+T-2,T,2);ctx.fillRect(px+T-2,py,2,T);
+          if((tx*7+ty*11)%5===0){
+            ctx.fillStyle='rgba(255,230,100,0.2)';
+            ctx.fillRect(px+5,py+5,9,9);ctx.fillRect(px+T-14,py+5,9,9);
+          }
+          if((tx*3+ty*9)%7===0){
+            ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fillRect(px+3,py+T-10,T-6,7);
+          }
+          break;
+        case PK:
+          ctx.fillStyle=(tx+ty)%2===0?'#1a3320':'#1f4028';ctx.fillRect(px,py,T,T);
+          if((tx*5+ty*9)%6===0){
+            ctx.fillStyle='#1b5e20';ctx.beginPath();ctx.arc(px+T/2,py+T/2,9,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#2e7d32';ctx.beginPath();ctx.arc(px+T/2,py+T/2,7,0,Math.PI*2);ctx.fill();
+            ctx.fillStyle='#388e3c';ctx.beginPath();ctx.arc(px+T/2-2,py+T/2-2,4,0,Math.PI*2);ctx.fill();
+          }
+          break;
+        case WA:
+          ctx.fillStyle='#0d2233';ctx.fillRect(px,py,T,T);
+          ctx.fillStyle='rgba(79,195,247,0.12)';
+          ctx.fillRect(px,py+((ty*4+Math.floor(fc*0.4))%T),T,5);
+          ctx.fillRect(px,py+((ty*4+Math.floor(fc*0.4)+15)%T),T,3);
+          break;
+      }
+    }
+  }
+}
+
+function drawLabels(){
+  ctx.globalAlpha=0.45; ctx.textAlign='center';
+  for(const lb of LABELS){
+    ctx.font='bold 13px "Courier New"'; ctx.fillStyle=lb.c;
+    ctx.fillText(lb.t,lb.x,lb.y);
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawPOIs(){
+  // Gang territory fills
+  ctx.globalAlpha=0.07;
+  ctx.fillStyle='#2ecc40'; ctx.fillRect(0,1080,720,840);
+  ctx.fillStyle='#e74c3c'; ctx.fillRect(960,0,960,700);
+  ctx.fillStyle='#3498db'; ctx.fillRect(1180,680,740,1240);
+  ctx.globalAlpha=1;
+
+  // Gun shop
+  ctx.shadowColor='#e74c3c'; ctx.shadowBlur=12;
+  ctx.strokeStyle='#e74c3c'; ctx.lineWidth=2.5; ctx.fillStyle='rgba(231,76,60,0.18)';
+  ctx.beginPath(); ctx.arc(GUN_SHOP.px,GUN_SHOP.py,GUN_SHOP.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff'; ctx.font='18px Arial'; ctx.textAlign='center';
+  ctx.fillText('🔫',GUN_SHOP.px,GUN_SHOP.py+6);
+  ctx.fillStyle='rgba(231,76,60,0.8)'; ctx.font='bold 9px "Courier New"';
+  ctx.fillText("VIKTOR'S ARMS",GUN_SHOP.px,GUN_SHOP.py+GUN_SHOP.r+12);
+
+  // Hospital
+  ctx.shadowColor='#2ecc40'; ctx.shadowBlur=10;
+  ctx.strokeStyle='#2ecc40'; ctx.lineWidth=2.5; ctx.fillStyle='rgba(46,204,64,0.12)';
+  ctx.beginPath(); ctx.arc(HOSPITAL.px,HOSPITAL.py,HOSPITAL.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#2ecc40'; ctx.font='bold 22px Arial'; ctx.textAlign='center';
+  ctx.fillText('+',HOSPITAL.px,HOSPITAL.py+7);
+  ctx.fillStyle='rgba(46,204,64,0.8)'; ctx.font='bold 9px "Courier New"';
+  ctx.fillText('HOSPITAL',HOSPITAL.px,HOSPITAL.py+HOSPITAL.r+12);
+
+  // Phone booths
+  for(const b of BOOTHS){
+    if(player.doneMissions.includes(b.mid)) continue;
+    const gc=b.gangId>=0?GANGS[b.gangId].col:'#f9ca24';
+    const pulse=0.5+Math.sin(fc*0.08+b.px)*0.5;
+    ctx.shadowColor=gc; ctx.shadowBlur=8*pulse;
+    ctx.strokeStyle=gc; ctx.lineWidth=2; ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.beginPath(); ctx.arc(b.px,b.py,16,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.fillStyle=gc; ctx.font='13px Arial'; ctx.textAlign='center';
+    ctx.fillText('☎',b.px,b.py+4);
+  }
+}
+
+function drawMissionMarkers(){
+  if(!mission||mStep>=mission.steps.length) return;
+  const step=mission.steps[mStep];
+  const pulse=0.55+Math.sin(fc*0.14)*0.45;
+  ctx.globalAlpha=pulse;
+  ctx.shadowColor=step.col; ctx.shadowBlur=16;
+  ctx.strokeStyle=step.col; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(step.px,step.py,32,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle=step.col; ctx.globalAlpha=0.18*pulse;
+  ctx.beginPath(); ctx.arc(step.px,step.py,32,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1; ctx.shadowBlur=0;
+  // Arrow indicator if far
+  if(dist(player,{px:step.px,py:step.py})>90){
+    const da=ang2(player,{px:step.px,py:step.py});
+    const ax=player.px+Math.cos(da)*56, ay=player.py+Math.sin(da)*56;
+    ctx.save(); ctx.translate(ax,ay); ctx.rotate(da);
+    ctx.fillStyle=step.col; ctx.globalAlpha=0.85;
+    ctx.beginPath(); ctx.moveTo(12,0); ctx.lineTo(-8,7); ctx.lineTo(-8,-7); ctx.closePath(); ctx.fill();
+    ctx.restore(); ctx.globalAlpha=1;
+  }
+}
+
+// ── CARS ──────────────────────────────────────────
+function drawCars(){
+  for(const car of cars) drawCar(car);
+}
+function drawCar(car){
+  ctx.save(); ctx.translate(car.px,car.py); ctx.rotate(car.angle);
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fillRect(-12,20,24,6);
+  // Body
+  ctx.fillStyle=car.color;
+  ctx.beginPath(); ctx.roundRect(-12,-22,24,44,3); ctx.fill();
+  // Roof
+  ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(-8,-15,16,28);
+  // Windshields
+  ctx.fillStyle='rgba(180,230,255,0.55)';
+  ctx.fillRect(-9,-20,18,9); ctx.fillRect(-9,13,18,8);
+  // Lights
+  ctx.fillStyle='#fff8dc'; ctx.fillRect(-10,-22,5,4); ctx.fillRect(5,-22,5,4);
+  ctx.fillStyle=car.speed<-0.5?'#ff4444':'#880000'; ctx.fillRect(-10,18,5,4); ctx.fillRect(5,18,5,4);
+  // Wheels
+  ctx.fillStyle='#111';
+  [[-14,-13,6,10],[-14,7,6,10],[8,-13,6,10],[8,7,6,10]].forEach(([x,y,w,h])=>ctx.fillRect(x,y,w,h));
+  // Cop lightbar
+  if(car.isCop){
+    ctx.fillStyle='rgba(10,60,220,0.7)'; ctx.fillRect(-7,-5,14,6);
+    const fl=Math.floor(fc/7)%2;
+    ctx.fillStyle=fl?'#ffff00':'#ff0000'; ctx.fillRect(-7,-5,5,5);
+    ctx.fillStyle=fl?'#0000ff':'#ffff00'; ctx.fillRect(2,-5,5,5);
+  }
+  ctx.restore();
+}
+
+// ── ENTITIES ──────────────────────────────────────
+function drawNPCList(list,type){
+  for(const e of list) drawNPC(e,type);
+}
+function drawNPC(e,type){
+  ctx.save(); ctx.translate(e.px,e.py); ctx.rotate(e.angle+Math.PI/2);
+  const dead=e.state==='dead';
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0,3,8,4,0,0,Math.PI*2); ctx.fill();
+  // Body
+  let bc=type==='cop'?'#1a3a8f':e.color||'#888';
+  if(type==='target') bc='#ff6b35';
+  ctx.fillStyle=dead?'rgba(100,50,50,0.45)':bc;
+  ctx.beginPath(); ctx.ellipse(0,0,6,9,0,0,Math.PI*2); ctx.fill();
+  if(!dead){
+    // Head
+    ctx.fillStyle=type==='cop'?'#ddd':SKIN;
+    ctx.beginPath(); ctx.arc(0,-12,5.5,0,Math.PI*2); ctx.fill();
+    // Cop hat
+    if(type==='cop'){ctx.fillStyle='#0d0d66';ctx.fillRect(-6,-18,12,5);ctx.fillRect(-5,-20,10,3);}
+    // Gang bandana
+    if(type==='gang'&&e.gang>=0){ctx.fillStyle=GANGS[e.gang].dark;ctx.fillRect(-5,-15,10,4);}
+    // Target X marker
+    if(type==='target'||e.type==='target'){
+      ctx.strokeStyle='#ff0000';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(-4,-18);ctx.lineTo(4,-10);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(4,-18);ctx.lineTo(-4,-10);ctx.stroke();
+    }
+  }
+  ctx.restore();
+  // HP bar
+  if(!dead&&e.health<e.maxHealth){
+    const bw=22;
+    ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(e.px-bw/2,e.py-26,bw,4);
+    ctx.fillStyle='#e74c3c'; ctx.fillRect(e.px-bw/2,e.py-26,bw*(e.health/e.maxHealth),4);
+  }
+}
+
+function drawPlayer(){
+  if(player.dead) return;
+  if(player.inCar){
+    ctx.fillStyle=SKIN; ctx.beginPath(); ctx.arc(player.px,player.py,6,0,Math.PI*2); ctx.fill();
+    return;
+  }
+  ctx.save(); ctx.translate(player.px,player.py); ctx.rotate(player.angle+Math.PI/2);
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(0,4,10,5,0,0,Math.PI*2); ctx.fill();
+  // Body
+  ctx.fillStyle=player.invT%4<2?'#ffffff':'#c0392b';
+  ctx.beginPath(); ctx.roundRect(-8,-10,16,18,4); ctx.fill();
+  // Arms
+  ctx.fillStyle='#c0392b'; ctx.fillRect(-12,-5,5,9); ctx.fillRect(7,-5,5,9);
+  // Legs
+  ctx.fillStyle='#1a3a6a'; ctx.fillRect(-7,7,5,8); ctx.fillRect(2,7,5,8);
+  // Head
+  ctx.fillStyle=SKIN; ctx.beginPath(); ctx.arc(0,-16,8,0,Math.PI*2); ctx.fill();
+  // Canadian toque
+  ctx.fillStyle='#c62828';
+  ctx.beginPath(); ctx.arc(0,-20,8,Math.PI,0); ctx.fill();
+  ctx.fillRect(-8,-22,16,4);
+  ctx.fillStyle='#fff'; ctx.fillRect(-6,-25,12,4);
+  ctx.beginPath(); ctx.arc(0,-28,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // HP bar
+  const hw=40;
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(player.px-hw/2,player.py-38,hw,5);
+  ctx.fillStyle=player.health>50?'#2ecc40':player.health>25?'#f39c12':'#e74c3c';
+  ctx.fillRect(player.px-hw/2,player.py-38,hw*(player.health/player.maxHealth),5);
+}
+
+function drawBullets(){
+  for(const b of bullets){
+    ctx.fillStyle=b.team==='player'?'#ffe500':'#ff8c00';
+    ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=6;
+    ctx.beginPath(); ctx.arc(b.px,b.py,3,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+}
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha=p.life; ctx.fillStyle=p.col;
+    ctx.beginPath(); ctx.arc(p.px,p.py,p.r*p.life,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+// ── HUD ───────────────────────────────────────────
+function drawHUD(){
+  // ── Health ──
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(10,H-52,155,42,8); ctx.fill();
+  ctx.fillStyle='#888'; ctx.font='9px "Courier New"'; ctx.textAlign='left';
+  ctx.fillText('HP',18,H-35);
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(35,H-43,100,14);
+  ctx.fillStyle=player.health>50?'#2ecc40':player.health>25?'#f39c12':'#e74c3c';
+  ctx.fillRect(35,H-43,100*(player.health/player.maxHealth),14);
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1; ctx.strokeRect(35,H-43,100,14);
+  ctx.fillStyle='#fff'; ctx.font='9px "Courier New"';
+  ctx.fillText(Math.ceil(player.health)+'%',138,H-32);
+  ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='9px "Courier New"';
+  ctx.fillText('SHIFT=Run  E=Car  F=Use',18,H-17);
+
+  // ── Money ──
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(10,10,145,34,8); ctx.fill();
+  ctx.fillStyle='#f9ca24'; ctx.font='bold 14px "Courier New"'; ctx.textAlign='left';
+  ctx.fillText('$'+player.money.toLocaleString(),18,H-H+30);
+
+  // ── Weapon ──
+  const wep=WEAPONS[player.weapons[player.weapIdx]];
+  const ammoStr=wep.id===0?'∞':player.ammo[wep.id];
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(W-168,H-52,158,42,8); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 11px "Courier New"'; ctx.textAlign='right';
+  ctx.fillText(wep.name,W-14,H-33);
+  ctx.fillStyle='#f9ca24'; ctx.font='10px "Courier New"';
+  ctx.fillText('AMMO: '+ammoStr,W-14,H-17);
+  // Weapon slots
+  ctx.textAlign='center';
+  player.weapons.forEach((wid,i)=>{
+    const sel=i===player.weapIdx;
+    const wx=W-168+(i*30), wy=H-56;
+    ctx.fillStyle=sel?'rgba(255,255,255,0.2)':'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.roundRect(wx,wy,24,16,3); ctx.fill();
+    if(sel){ctx.strokeStyle='#f9ca24';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(wx,wy,24,16,3);ctx.stroke();}
+    ctx.fillStyle=sel?'#f9ca24':'#888'; ctx.font='9px "Courier New"';
+    ctx.fillText(i+1,wx+12,wy+11);
+  });
+
+  // ── Wanted stars ──
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.beginPath(); ctx.roundRect(W-158,10,148,38,8); ctx.fill();
+  ctx.textAlign='center'; ctx.font='14px Arial';
+  for(let i=0;i<5;i++){
+    ctx.fillStyle=i<wanted?'#f9ca24':'rgba(255,255,255,0.12)';
+    ctx.fillText('★',W-145+(i*28),10+26);
+  }
+  if(wanted>0){
+    ctx.fillStyle=wanted>=3?'rgba(255,80,80,0.9)':'rgba(255,200,80,0.8)';
+    ctx.font='8px "Courier New"'; ctx.textAlign='center';
+    ctx.fillText(wanted>=4?'ARMED RESPONSE':wanted>=3?'DISPATCH':wanted>=2?'PATROL':'ALERT',W-84,10+14);
+  }
+
+  // ── Minimap ──
+  drawMinimap();
+
+  // ── Mission strip ──
+  if(mission&&mStep<mission.steps.length){
+    const step=mission.steps[mStep];
+    ctx.fillStyle='rgba(0,0,0,0.78)'; ctx.beginPath(); ctx.roundRect(W/2-145,10,290,50,8); ctx.fill();
+    ctx.strokeStyle=step.col; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle=step.col; ctx.font='bold 10px "Courier New"'; ctx.textAlign='center';
+    ctx.fillText(mission.title.toUpperCase()+'  ['+(mStep+1)+'/'+mission.steps.length+']',W/2,10+16);
+    ctx.fillStyle='#ddd'; ctx.font='10px "Courier New"';
+    ctx.fillText(step.desc,W/2,10+30);
+    const ds=Math.round(dist(player,{px:step.px,py:step.py})/4);
+    ctx.fillStyle=step.col; ctx.fillText(ds+'m',W/2,10+44);
+  }
+
+  // ── Near prompt ──
+  if(nearPrompt){
+    ctx.fillStyle='rgba(0,0,0,0.78)'; ctx.beginPath(); ctx.roundRect(W/2-120,H-90,240,26,7); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='bold 11px "Courier New"'; ctx.textAlign='center';
+    ctx.fillText(nearPrompt,W/2,H-72);
+  }
+
+  // ── Toast ──
+  if(toastMsg&&toastTimer>0){
+    ctx.globalAlpha=Math.min(1,toastTimer/40);
+    ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.beginPath(); ctx.roundRect(W/2-130,H/2-60,260,32,8); ctx.fill();
+    ctx.fillStyle='#f9ca24'; ctx.font='bold 12px "Courier New"'; ctx.textAlign='center';
+    ctx.fillText(toastMsg,W/2,H/2-38);
+    ctx.globalAlpha=1;
+  }
+
+  // ── Stats strip ──
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.roundRect(10,50,145,24,6); ctx.fill();
+  ctx.fillStyle='#aaa'; ctx.font='9px "Courier New"'; ctx.textAlign='left';
+  ctx.fillText('☠ '+player.kills+' kills   ✓ '+player.doneMissions.length+'/4 missions',16,50+16);
+
+  // ── Gang territory warning ──
+  const gang=gangAt(player.px,player.py);
+  if(gang){
+    ctx.fillStyle=gang.col; ctx.font='bold 11px "Courier New"'; ctx.textAlign='center';
+    ctx.globalAlpha=0.8+Math.sin(fc*0.1)*0.2;
+    ctx.fillText('⚠ '+gang.name+' Territory',W/2,H-98);
+    ctx.globalAlpha=1;
+  }
+}
+
+function drawMinimap(){
+  const MX=W-85, MY=H-145, MS=75;
+  ctx.fillStyle='rgba(0,0,0,0.78)';
+  ctx.beginPath(); ctx.roundRect(MX-MS/2-4,MY-MS/2-4,MS+8,MS+8,5); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.save(); ctx.beginPath(); ctx.rect(MX-MS/2,MY-MS/2,MS,MS); ctx.clip();
+  ctx.fillStyle='#1a1a1e'; ctx.fillRect(MX-MS/2,MY-MS/2,MS,MS);
+  const sc=MS/WW;
+  const wx=px=>MX-MS/2+px*sc, wy=py=>MY-MS/2+py*sc;
+  // Parks
+  ctx.fillStyle='#1a3320';
+  for(let ty=0;ty<MH;ty+=2)for(let tx=0;tx<MW;tx+=2)
+    if(map[ty][tx]===PK) ctx.fillRect(wx(tx*T),wy(ty*T),T*sc*2,T*sc*2);
+  // Road grid lines
+  ctx.fillStyle='#2a2a2a';
+  for(let i=0;i<6;i++){const l=i*(MS/5.6);ctx.fillRect(MX-MS/2+l,MY-MS/2,2,MS);ctx.fillRect(MX-MS/2,MY-MS/2+l,MS,2);}
+  // Water
+  ctx.fillStyle='#0d2233'; ctx.fillRect(MX-MS/2,wy(24*T),MS,3*T*sc);
+  // Gang territories
+  ctx.fillStyle='rgba(46,204,64,0.18)';  ctx.fillRect(MX-MS/2,wy(1080),wx(720)-MX+MS/2,MY+MS/2-wy(1080));
+  ctx.fillStyle='rgba(231,76,60,0.18)';  ctx.fillRect(wx(960),MY-MS/2,MS-(wx(960)-MX+MS/2),wy(700)-MY+MS/2);
+  ctx.fillStyle='rgba(52,152,219,0.18)'; ctx.fillRect(wx(1180),wy(680),MS-(wx(1180)-MX+MS/2),MY+MS/2-wy(680));
+  // POIs
+  ctx.fillStyle='#e74c3c'; ctx.beginPath(); ctx.arc(wx(GUN_SHOP.px),wy(GUN_SHOP.py),3,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#2ecc40'; ctx.beginPath(); ctx.arc(wx(HOSPITAL.px),wy(HOSPITAL.py),3,0,Math.PI*2); ctx.fill();
+  BOOTHS.forEach(b=>{if(!player.doneMissions.includes(b.mid)){
+    const gc=b.gangId>=0?GANGS[b.gangId].col:'#f9ca24';
+    ctx.fillStyle=gc; ctx.beginPath(); ctx.arc(wx(b.px),wy(b.py),2,0,Math.PI*2); ctx.fill();
+  }});
+  // Cops
+  cops.filter(c=>c.state!=='dead').forEach(c=>{
+    ctx.fillStyle='#4af'; ctx.beginPath(); ctx.arc(wx(c.px),wy(c.py),2,0,Math.PI*2); ctx.fill();
+  });
+  // Mission marker
+  if(mission&&mStep<mission.steps.length){
+    const s=mission.steps[mStep];
+    if(Math.floor(fc/16)%2){ctx.fillStyle=s.col;ctx.beginPath();ctx.arc(wx(s.px),wy(s.py),4,0,Math.PI*2);ctx.fill();}
+  }
+  // Player
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(wx(player.px),wy(player.py),3,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#f9ca24'; ctx.lineWidth=1; ctx.stroke();
+  ctx.restore();
+}
+
+// ── OVERLAYS ──────────────────────────────────────
+function drawShop(){
+  const BX=W/2-190, BY=H/2-175, BW=380, BH=350;
+  ctx.fillStyle='rgba(0,0,0,0.9)'; ctx.beginPath(); ctx.roundRect(BX,BY,BW,BH,14); ctx.fill();
+  ctx.strokeStyle='#e74c3c'; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.fillStyle='#e74c3c'; ctx.font='bold 14px "Courier New"'; ctx.textAlign='center';
+  ctx.fillText("── VIKTOR'S ARMS ─ OTTAWA ──",W/2,BY+28);
+  ctx.fillStyle='#666'; ctx.font='10px "Courier New"';
+  ctx.fillText('No questions asked. Cash only.',W/2,BY+46);
+
+  [[1,'Pistol',40],[2,'Shotgun',20],[3,'SMG',60]].forEach(([wid,name,refill],i)=>{
+    const w=WEAPONS[wid]; const owned=player.weapons.includes(wid);
+    const iy=BY+66+i*82;
+    ctx.fillStyle=i===shopTab?'rgba(231,76,60,0.22)':'rgba(255,255,255,0.03)';
+    ctx.beginPath(); ctx.roundRect(BX+12,iy,BW-24,72,8); ctx.fill();
+    if(i===shopTab){ctx.strokeStyle='#e74c3c';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(BX+12,iy,BW-24,72,8);ctx.stroke();}
+    ctx.fillStyle=owned?'#2ecc40':'#fff'; ctx.font='bold 13px "Courier New"'; ctx.textAlign='left';
+    ctx.fillText((i===shopTab?'▶ ':' ')+w.name+(owned?' ✓':''),BX+24,iy+22);
+    ctx.fillStyle='#666'; ctx.font='9px "Courier New"';
+    ctx.fillText('DMG:'+w.dmg+'  RANGE:'+w.range+'  ROF:'+(w.rof<=5?'AUTO':w.rof+'f')+'  SPREAD:'+(w.spread?w.spread.toFixed(2):'none'),BX+24,iy+38);
+    ctx.fillStyle='#999'; ctx.font='9px "Courier New"';
+    ctx.fillText(owned?'Owned — refill '+refill+' ammo':'New weapon + '+refill+' ammo',BX+24,iy+54);
+    ctx.fillStyle='#f9ca24'; ctx.font='bold 12px "Courier New"'; ctx.textAlign='right';
+    ctx.fillText('$'+(owned?100:w.cost),BX+BW-24,iy+22);
+    const canAfford=player.money>=(owned?100:w.cost);
+    ctx.fillStyle=canAfford?'#2ecc40':'#e74c3c'; ctx.font='9px "Courier New"';
+    ctx.fillText(canAfford?'[SPACE] Buy':'Insufficient funds',BX+BW-24,iy+38);
+  });
+  ctx.fillStyle='#444'; ctx.font='10px "Courier New"'; ctx.textAlign='center';
+  ctx.fillText('[↑↓ / W S] Navigate   [SPACE] Buy   [ESC / Q] Exit',W/2,BY+BH-14);
+}
+
+function drawBrief(){
+  if(!mission) return;
+  const gc=mission.gang>=0?GANGS[mission.gang]:null;
+  const accent=gc?gc.col:'#f9ca24';
+  const BX=W/2-195, BY=H/2-155, BW=390, BH=310;
+  ctx.fillStyle='rgba(0,0,0,0.92)'; ctx.beginPath(); ctx.roundRect(BX,BY,BW,BH,14); ctx.fill();
+  ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.fillStyle=accent; ctx.font='bold 13px "Courier New"'; ctx.textAlign='center';
+  ctx.fillText((gc?gc.name+' presents:  ':'')+mission.title,W/2,BY+28);
+  ctx.fillStyle='#bbb'; ctx.font='12px "Courier New"';
+  mission.desc.forEach((l,i)=>ctx.fillText(l,W/2,BY+56+i*18));
+  ctx.fillStyle='#666'; ctx.font='bold 10px "Courier New"'; ctx.textAlign='left';
+  ctx.fillText('OBJECTIVES:',BX+20,BY+110);
+  mission.steps.forEach((s,i)=>{
+    ctx.fillStyle=s.col; ctx.font='10px "Courier New"';
+    ctx.fillText('• '+s.desc,BX+28,BY+128+i*15);
+  });
+  ctx.fillStyle=accent; ctx.font='bold 13px "Courier New"'; ctx.textAlign='center';
+  ctx.fillText('REWARD: $'+mission.reward,W/2,BY+BH-48);
+  const fl=Math.floor(fc/20)%2;
+  ctx.fillStyle=fl?'#fff':'#555'; ctx.font='11px "Courier New"';
+  ctx.fillText('[SPACE] Accept   [ESC] Decline',W/2,BY+BH-20);
+}
+
+function drawDead(){
+  ctx.fillStyle='rgba(180,0,0,0.15)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,0.75)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#e74c3c'; ctx.font='bold 52px "Courier New"'; ctx.textAlign='center';
+  ctx.shadowColor='#e74c3c'; ctx.shadowBlur=30;
+  ctx.fillText('WASTED',W/2,H/2-28); ctx.shadowBlur=0;
+  ctx.fillStyle='#888'; ctx.font='13px "Courier New"';
+  ctx.fillText('Respawn at Ottawa General Hospital',W/2,H/2+14);
+  const fl=Math.floor(fc/22)%2;
+  ctx.fillStyle=fl?'#fff':'#444'; ctx.font='bold 12px "Courier New"';
+  ctx.fillText('[SPACE] to respawn',W/2,H/2+46);
+}
+
+// ── SHOP KEY HANDLER ──────────────────────────────
+function handleShopKeys(){
+  if(gs!=='SHOP') return;
+  shopKeyT--;
+  if(shopKeyT>0) return;
+  if(keys['ArrowUp']||keys['KeyW']){shopTab=Math.max(0,shopTab-1);shopKeyT=14;}
+  if(keys['ArrowDown']||keys['KeyS']){shopTab=Math.min(2,shopTab+1);shopKeyT=14;}
+  if(keys['Space']){shopKeyT=20;buyWep([1,2,3][shopTab]);}
+}
+
+// ── MAIN UPDATE ───────────────────────────────────
+function update(){
+  fc++;
+  if(gs==='DEAD'){return;}
+  if(gs==='BRIEF'){return;}
+  if(gs==='SHOP'){handleShopKeys();return;}
+  if(toastTimer>0) toastTimer--;
+  updatePlayer();
+  updateWanted();
+  updateCops();
+  updateGangers();
+  updateCivs();
+  updateBullets();
+  updateMission();
+  updateParticles();
+  updateCam();
+}
+
+// ── MAIN DRAW ─────────────────────────────────────
+function draw(){
+  ctx.fillStyle='#111'; ctx.fillRect(0,0,W,H);
+  drawWorld();
+  drawHUD();
+  if(gs==='SHOP') drawShop();
+  if(gs==='BRIEF') drawBrief();
+  if(gs==='DEAD') drawDead();
+}
+
+// ── LOOP ──────────────────────────────────────────
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+initGame(); loop();
+</script>
+</body>
+</html>

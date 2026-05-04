@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pong Luigi</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0d1a; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; }
+  canvas { display:block; image-rendering:pixelated; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ─────────────────────────────────────────
+//  PONG LUIGI  —  Canvas Game Engine
+// ─────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+const W = 560, H = 480, HUD = 60;
+canvas.width = W; canvas.height = H + HUD;
+
+const C = {
+  bg:'#0d0d1a', grid:'#12122a', hud:'#080812', hudLine:'#1a1a40',
+  green1:'#2ecc40', green2:'#27ae60', gold:'#f9ca24', silver:'#bdc3c7',
+  red:'#e74c3c', white:'#ffffff', textLo:'#556688', star:'#f1c40f',
+  luigiGreen:'#2e7d32', luigiSkin:'#f5cba7', luigiMust:'#6d4c41',
+  ballGlow:'rgba(249,202,36,0.4)', p1color:'#2ecc40', p2color:'#e74c3c',
+  pink:'#ff6b9d',
+};
+
+// ── Game state ──
+let state = 'MENU';
+let scoreL=0, scoreR=0, lives=3, hiScore=0;
+let particles=[], toasts=[], frameCount=0;
+const WIN_SCORE = 7;
+const PADDLE_W=14, PADDLE_H=80, BALL_R=10;
+const PADDLE_SPEED = 5.5;
+const AI_SPEED = 4.2;
+
+let ball, padL, padR, keys={};
+let serving = 'L'; // who serves next
+let serveTimer = 0;
+let screenShake = 0;
+let rallyCount = 0;
+
+function reset(serveDir) {
+  serving = serveDir || 'L';
+  serveTimer = 60;
+  const angle = (Math.random() * 0.6 - 0.3);
+  const spd = 4.5;
+  ball = {
+    x: W/2, y: HUD + H/2,
+    vx: (serving==='L'?1:-1) * Math.cos(angle) * spd,
+    vy: Math.sin(angle) * spd,
+    speed: spd, trail:[], served: false,
+  };
+  rallyCount = 0;
+}
+
+function initGame() {
+  padL = { x:18, y:HUD+H/2-PADDLE_H/2, w:PADDLE_W, h:PADDLE_H, score:0 };
+  padR = { x:W-18-PADDLE_W, y:HUD+H/2-PADDLE_H/2, w:PADDLE_W, h:PADDLE_H, score:0 };
+  scoreL=0; scoreR=0; lives=3; frameCount=0;
+  particles=[]; toasts=[];
+  reset('L');
+}
+
+// ── Input ──
+document.addEventListener('keydown', e=>{
+  keys[e.key]=true;
+  if(['ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+  if(state==='MENU'){ state='PLAYING'; return; }
+  if(state==='OVER'){ initGame(); state='PLAYING'; return; }
+  if(e.key==='p'||e.key==='P') state = state==='PAUSED'?'PLAYING':'PAUSED';
+});
+document.addEventListener('keyup', e=>{ keys[e.key]=false; });
+
+// ── Particles ──
+function burst(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, s=2+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:1,decay:0.025+Math.random()*0.03,size:3+Math.random()*4,color});
+  }
+}
+function addToast(t,c){ toasts.push({text:t,color:c||C.gold,life:1,y:HUD+H/2,vy:-0.6}); }
+
+// ── Update ──
+function update(){
+  if(state!=='PLAYING') return;
+  frameCount++;
+  if(screenShake>0) screenShake--;
+
+  // Serve delay
+  if(serveTimer>0){ serveTimer--; if(serveTimer===0) ball.served=true; return; }
+  if(!ball.served) return;
+
+  // Player paddle (W/S or Up/Down)
+  if(keys['ArrowUp']||keys['w']||keys['W']) padL.y -= PADDLE_SPEED;
+  if(keys['ArrowDown']||keys['s']||keys['S']) padL.y += PADDLE_SPEED;
+  padL.y = Math.max(HUD, Math.min(HUD+H-PADDLE_H, padL.y));
+
+  // AI paddle (right)
+  const aim = ball.y - (padR.y + PADDLE_H/2);
+  padR.y += Math.sign(aim) * Math.min(AI_SPEED + level()*0.3, Math.abs(aim));
+  padR.y = Math.max(HUD, Math.min(HUD+H-PADDLE_H, padR.y));
+
+  // Ball trail
+  ball.trail.push({x:ball.x, y:ball.y});
+  if(ball.trail.length>10) ball.trail.shift();
+
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  // Top/bottom walls
+  if(ball.y - BALL_R < HUD){ ball.y=HUD+BALL_R; ball.vy*=-1; burst(ball.x,ball.y,C.white,6); }
+  if(ball.y + BALL_R > HUD+H){ ball.y=HUD+H-BALL_R; ball.vy*=-1; burst(ball.x,ball.y,C.white,6); }
+
+  // Paddle collisions
+  checkPaddleHit(padL, 1);
+  checkPaddleHit(padR,-1);
+
+  // Score
+  if(ball.x < -BALL_R){
+    scoreR++;
+    burst(W*0.1,HUD+H/2,C.red,20);
+    screenShake=12;
+    addToast('POINT!', C.red);
+    if(scoreR>=WIN_SCORE){ endGame(); return; }
+    reset('L');
+  }
+  if(ball.x > W+BALL_R){
+    scoreL++;
+    burst(W*0.9,HUD+H/2,C.green1,20);
+    screenShake=12;
+    addToast('POINT!', C.green1);
+    if(scoreL>=WIN_SCORE){ endGame(); return; }
+    reset('R');
+  }
+
+  // Particles & toasts
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.07; p.life-=p.decay;
+    if(p.life<=0) particles.splice(i,1);
+  }
+  for(let i=toasts.length-1;i>=0;i--){
+    const t=toasts[i]; t.life-=0.016; t.y+=t.vy;
+    if(t.life<=0) toasts.splice(i,1);
+  }
+}
+
+function level(){ return Math.floor((scoreL+scoreR)/4)+1; }
+
+function checkPaddleHit(pad, dir){
+  if(dir===1 && ball.x-BALL_R<=pad.x+pad.w && ball.x+BALL_R>=pad.x && ball.y>=pad.y && ball.y<=pad.y+pad.h && ball.vx<0){
+    hitPaddle(pad, dir);
+  }
+  if(dir===-1 && ball.x+BALL_R>=pad.x && ball.x-BALL_R<=pad.x+pad.w && ball.y>=pad.y && ball.y<=pad.y+pad.h && ball.vx>0){
+    hitPaddle(pad, dir);
+  }
+}
+
+function hitPaddle(pad, dir){
+  rallyCount++;
+  const rel = (ball.y - (pad.y + pad.h/2)) / (pad.h/2); // -1..1
+  const angle = rel * 0.9;
+  ball.speed = Math.min(ball.speed + 0.25, 14);
+  ball.vx = dir * Math.cos(angle) * ball.speed;
+  ball.vy = Math.sin(angle) * ball.speed;
+  ball.x = dir===1 ? pad.x+pad.w+BALL_R+1 : pad.x-BALL_R-1;
+  burst(ball.x, ball.y, dir===1?C.green1:C.red, 10);
+  screenShake=5;
+  if(rallyCount>0 && rallyCount%5===0) addToast(`${rallyCount} RALLY!`, C.star);
+}
+
+function endGame(){
+  if(scoreL>hiScore) hiScore=scoreL;
+  state='OVER';
+}
+
+// ─────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────
+function draw(){
+  ctx.clearRect(0,0,W,H+HUD);
+  const sx = screenShake>0?(Math.random()-0.5)*5:0;
+  const sy = screenShake>0?(Math.random()-0.5)*4:0;
+  ctx.save(); ctx.translate(sx,sy);
+
+  drawHUD();
+  drawArena();
+  drawBall();
+  drawPaddle(padL, 'L');
+  drawPaddle(padR, 'R');
+  drawParticles();
+  drawToasts();
+  ctx.restore();
+
+  if(state==='MENU')    drawMenu();
+  if(state==='PAUSED')  drawPause();
+  if(state==='OVER')    drawOver();
+  if(ball && serveTimer>0 && state==='PLAYING') drawServePrompt();
+}
+
+function drawHUD(){
+  ctx.fillStyle=C.hud; ctx.fillRect(0,0,W,HUD);
+  ctx.strokeStyle=C.hudLine; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,HUD); ctx.lineTo(W,HUD); ctx.stroke();
+
+  ctx.textAlign='center';
+  ctx.font='bold 22px "Courier New"'; ctx.fillStyle=C.green1;
+  ctx.fillText('PONG LUIGI',W/2,22);
+
+  // Scores
+  ctx.font='bold 28px "Courier New"';
+  ctx.fillStyle=C.p1color; ctx.textAlign='right';
+  ctx.fillText(scoreL, W/2-30, 52);
+  ctx.fillStyle=C.textLo; ctx.textAlign='center';
+  ctx.font='bold 20px "Courier New"';
+  ctx.fillText(':', W/2, 52);
+  ctx.fillStyle=C.p2color; ctx.textAlign='left';
+  ctx.font='bold 28px "Courier New"';
+  ctx.fillText(scoreR, W/2+30, 52);
+
+  ctx.font='bold 12px "Courier New"'; ctx.fillStyle=C.textLo;
+  ctx.textAlign='left'; ctx.fillText('YOU',14,18);
+  ctx.textAlign='right'; ctx.fillText('CPU',W-14,18);
+
+  ctx.textAlign='left'; ctx.font='12px "Courier New"'; ctx.fillStyle=C.textLo;
+  ctx.fillText(`LV ${level()}`, 14, 36);
+  ctx.textAlign='right';
+  ctx.fillText(`BEST ${hiScore}`, W-14, 36);
+}
+
+function drawArena(){
+  ctx.fillStyle=C.bg; ctx.fillRect(0,HUD,W,H);
+  // Dashed center line
+  ctx.strokeStyle=C.hudLine; ctx.lineWidth=3; ctx.setLineDash([12,12]);
+  ctx.beginPath(); ctx.moveTo(W/2,HUD); ctx.lineTo(W/2,HUD+H); ctx.stroke();
+  ctx.setLineDash([]);
+  // Serve zone arcs
+  ctx.strokeStyle=C.hudLine+'88'; ctx.lineWidth=1; ctx.setLineDash([4,8]);
+  ctx.beginPath(); ctx.arc(W/2,HUD+H/2,60,0,Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawBall(){
+  if(!ball) return;
+  // Trail
+  ball.trail.forEach((t,i)=>{
+    const a = (i/ball.trail.length)*0.35;
+    ctx.beginPath(); ctx.arc(t.x,t.y,BALL_R*(i/ball.trail.length)*0.9,0,Math.PI*2);
+    ctx.fillStyle=`rgba(249,202,36,${a})`; ctx.fill();
+  });
+  if(serveTimer>0) return;
+  // Glow
+  const grd=ctx.createRadialGradient(ball.x,ball.y,0,ball.x,ball.y,BALL_R*2);
+  grd.addColorStop(0,C.ballGlow); grd.addColorStop(1,'transparent');
+  ctx.beginPath(); ctx.arc(ball.x,ball.y,BALL_R*2.5,0,Math.PI*2);
+  ctx.fillStyle=grd; ctx.fill();
+  // Ball (coin style)
+  const g2=ctx.createRadialGradient(ball.x-3,ball.y-3,1,ball.x,ball.y,BALL_R);
+  g2.addColorStop(0,'#fff176'); g2.addColorStop(0.5,C.gold); g2.addColorStop(1,'#c8a000');
+  ctx.beginPath(); ctx.arc(ball.x,ball.y,BALL_R,0,Math.PI*2);
+  ctx.fillStyle=g2; ctx.fill();
+  ctx.strokeStyle='#a07800'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='#a07800'; ctx.font=`bold ${BALL_R}px "Courier New"`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('$',ball.x,ball.y+1); ctx.textBaseline='alphabetic';
+}
+
+function drawPaddle(pad, side){
+  const isLeft = side==='L';
+  // Glow
+  const gx = isLeft ? pad.x+pad.w : pad.x;
+  const gr=ctx.createRadialGradient(gx,pad.y+pad.h/2,0,gx,pad.y+pad.h/2,PADDLE_H*0.7);
+  gr.addColorStop(0,`${isLeft?C.p1color:C.p2color}33`); gr.addColorStop(1,'transparent');
+  ctx.fillStyle=gr;
+  ctx.fillRect(pad.x-20,pad.y,pad.w+40,pad.h);
+
+  // Body
+  ctx.fillStyle=isLeft?C.luigiGreen:'#8b0000';
+  ctx.beginPath();
+  ctx.roundRect(pad.x,pad.y,pad.w,pad.h,6);
+  ctx.fill();
+  // Highlight
+  ctx.fillStyle=isLeft?'#4ade6a':'#ff4444';
+  ctx.beginPath();
+  ctx.roundRect(pad.x+(isLeft?2:pad.w-4),pad.y+4,2,pad.h-8,2);
+  ctx.fill();
+
+  // Mini Luigi/Bowser face on paddle
+  const fcx=pad.x+pad.w/2, fcy=pad.y+pad.h/2;
+  if(isLeft){
+    // Mini Luigi cap
+    ctx.fillStyle=C.luigiGreen;
+    ctx.beginPath(); ctx.arc(fcx,fcy-4,5,Math.PI,0); ctx.fill();
+    ctx.fillStyle=C.luigiSkin;
+    ctx.beginPath(); ctx.arc(fcx,fcy+1,4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=C.luigiMust;
+    ctx.beginPath(); ctx.ellipse(fcx,fcy+3,3.5,1.2,0,0,Math.PI); ctx.fill();
+  } else {
+    // Mini Bowser-ish
+    ctx.fillStyle='#cc6600';
+    ctx.beginPath(); ctx.arc(fcx,fcy,5.5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff';
+    ctx.beginPath(); ctx.arc(fcx-1.5,fcy-1,2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#333';
+    ctx.beginPath(); ctx.arc(fcx-1.5,fcy-1,0.8,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawToasts(){
+  for(const t of toasts){
+    ctx.globalAlpha=Math.min(1,t.life*2);
+    ctx.font='bold 16px "Courier New"';
+    ctx.textAlign='center';
+    ctx.fillStyle=t.color;
+    ctx.fillText(t.text,W/2,t.y);
+  }
+  ctx.globalAlpha=1;
+}
+
+function overlay(a){ ctx.fillStyle=`rgba(5,3,18,${a})`; ctx.fillRect(0,HUD,W,H); }
+
+function drawServePrompt(){
+  ctx.textAlign='center';
+  const flash=Math.floor(frameCount/15)%2;
+  ctx.font='bold 14px "Courier New"';
+  ctx.fillStyle=flash?C.white:C.textLo;
+  ctx.fillText('SERVE!', W/2, HUD+H-20);
+}
+
+function drawMenu(){
+  overlay(0.88);
+  const bob=Math.sin(frameCount*0.04)*5;
+  // Draw bouncing coin
+  ctx.save();
+  ctx.translate(W/2, HUD+100+bob);
+  const g=ctx.createRadialGradient(-4,-4,1,0,0,20);
+  g.addColorStop(0,'#fff176'); g.addColorStop(0.5,C.gold); g.addColorStop(1,'#c8a000');
+  ctx.beginPath(); ctx.arc(0,0,20,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+  ctx.font='bold 20px "Courier New"'; ctx.fillStyle='#a07800';
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('$',0,1);
+  ctx.textBaseline='alphabetic';
+  ctx.restore();
+
+  ctx.textAlign='center';
+  ctx.font='bold 34px "Courier New"'; ctx.fillStyle=C.green1;
+  ctx.fillText('PONG', W/2, HUD+160);
+  ctx.fillStyle=C.gold;
+  ctx.fillText('LUIGI', W/2, HUD+200);
+
+  ctx.font='14px "Courier New"'; ctx.fillStyle=C.textLo;
+  ctx.fillText('W / S  or  ↑ / ↓  to move', W/2, HUD+245);
+  ctx.fillText(`First to ${WIN_SCORE} wins!`, W/2, HUD+268);
+
+  const fl=Math.floor(frameCount/20)%2;
+  ctx.font='bold 15px "Courier New"'; ctx.fillStyle=fl?C.white:C.textLo;
+  ctx.fillText('PRESS ANY KEY TO START', W/2, HUD+315);
+  ctx.font='12px "Courier New"'; ctx.fillStyle=C.textLo;
+  ctx.fillText('P to pause', W/2, HUD+345);
+}
+
+function drawPause(){
+  overlay(0.72);
+  ctx.textAlign='center';
+  ctx.font='bold 30px "Courier New"'; ctx.fillStyle=C.gold;
+  ctx.fillText('PAUSED', W/2, HUD+H/2);
+  ctx.font='15px "Courier New"'; ctx.fillStyle=C.textLo;
+  ctx.fillText('P to resume', W/2, HUD+H/2+36);
+}
+
+function drawOver(){
+  overlay(0.85);
+  ctx.textAlign='center';
+  const won = scoreL>=WIN_SCORE;
+  ctx.font='bold 28px "Courier New"';
+  ctx.fillStyle=won?C.green1:C.red;
+  ctx.fillText(won?'WAHOO! YOU WIN!':'MAMA MIA! YOU LOSE', W/2, HUD+H/2-60);
+  ctx.font='18px "Courier New"'; ctx.fillStyle=C.white;
+  ctx.fillText(`${scoreL}  :  ${scoreR}`, W/2, HUD+H/2-15);
+  ctx.font='13px "Courier New"'; ctx.fillStyle=C.silver;
+  ctx.fillText(`Best Score: ${hiScore}`, W/2, HUD+H/2+20);
+  const fl=Math.floor(frameCount/18)%2;
+  ctx.font='bold 14px "Courier New"'; ctx.fillStyle=fl?C.white:C.textLo;
+  ctx.fillText('PRESS ANY KEY TO PLAY AGAIN', W/2, HUD+H/2+70);
+}
+
+// ── Loop ──
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+initGame(); state='MENU'; loop();
+</script>
+</body>
+</html>

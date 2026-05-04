@@ -1,0 +1,2359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Royal Chess — Nicky's Game Lounge</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── ROOT VARIABLES ────────────────────────────────────────────── */
+:root {
+  --bg: #07090f;
+  --panel: rgba(255,255,255,0.035);
+  --panel-border: rgba(255,255,255,0.07);
+  --gold: #e8b84b;
+  --gold-dim: rgba(232,184,75,0.18);
+  --gold-glow: rgba(232,184,75,0.55);
+  --silver: #c8d4e0;
+  --silver-dim: rgba(200,212,224,0.15);
+  --silver-glow: rgba(200,212,224,0.5);
+  --sq-light: rgba(200,215,235,0.10);
+  --sq-dark: rgba(0,0,0,0.40);
+  --sq-select: rgba(232,184,75,0.45);
+  --sq-valid: rgba(100,220,120,0.30);
+  --sq-check: rgba(220,60,60,0.55);
+  --sq-strat-from: rgba(160,100,255,0.50);
+  --sq-strat-to: rgba(160,100,255,0.30);
+  --sq-last-from: rgba(232,184,75,0.22);
+  --sq-last-to: rgba(232,184,75,0.33);
+  --accent-purple: #a864ff;
+  --text: #dde4ef;
+  --text-dim: rgba(221,228,239,0.50);
+  --radius: 12px;
+  --sq: min(calc((100vw - 160px) / 8), calc((100vh - 220px) / 8), 72px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Raleway', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background-image:
+    radial-gradient(ellipse 60% 40% at 20% 10%, rgba(232,184,75,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 80% 90%, rgba(160,100,255,0.06) 0%, transparent 60%);
+}
+
+/* ── SCREENS ───────────────────────────────────────────────────── */
+.screen { display:none; min-height:100dvh; }
+.screen.active { display:flex; flex-direction:column; }
+
+/* ══ SETUP SCREEN ══════════════════════════════════════════════ */
+#screen-setup {
+  align-items:center;
+  justify-content:center;
+  padding:24px 16px;
+  gap:0;
+}
+
+.logo {
+  text-align:center;
+  margin-bottom:28px;
+}
+.logo-lounge {
+  font-family:'Raleway',sans-serif;
+  font-weight:300;
+  font-size:12px;
+  letter-spacing:6px;
+  text-transform:uppercase;
+  color:var(--text-dim);
+  margin-bottom:6px;
+}
+.logo-title {
+  font-family:'Cinzel',serif;
+  font-weight:900;
+  font-size:clamp(28px,5vw,48px);
+  background:linear-gradient(135deg,var(--gold) 30%,var(--silver) 70%);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  line-height:1;
+  letter-spacing:2px;
+}
+.logo-crown { font-size:clamp(22px,4vw,38px); display:block; margin-bottom:4px; }
+
+.setup-card {
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:20px;
+  padding:28px 24px;
+  width:100%;
+  max-width:480px;
+  backdrop-filter:blur(20px);
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+
+.setup-section { display:flex; flex-direction:column; gap:8px; }
+.setup-label {
+  font-family:'Cinzel',serif;
+  font-size:11px;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--text-dim);
+}
+
+.btn-group { display:flex; gap:8px; flex-wrap:wrap; }
+.btn-opt {
+  flex:1;
+  min-width:80px;
+  padding:10px 12px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:8px;
+  color:var(--text);
+  font-family:'Raleway',sans-serif;
+  font-size:13px;
+  font-weight:500;
+  cursor:pointer;
+  transition:all .2s;
+  text-align:center;
+}
+.btn-opt:hover { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.2); }
+.btn-opt.active {
+  background:var(--gold-dim);
+  border-color:var(--gold);
+  color:var(--gold);
+}
+.btn-opt.active-silver {
+  background:var(--silver-dim);
+  border-color:var(--silver);
+  color:var(--silver);
+}
+
+#diff-group, #clock-opts, #strategy-opt { transition:opacity .3s; }
+.hidden { opacity:0; pointer-events:none; height:0; overflow:hidden; margin:0!important; padding:0!important; }
+
+.clock-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+
+.player-names { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.name-input-wrap { display:flex; flex-direction:column; gap:5px; }
+.name-label { font-size:11px; font-weight:600; letter-spacing:1px; }
+.name-label.gold { color:var(--gold); }
+.name-label.silver { color:var(--silver); }
+.name-input {
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:8px;
+  color:var(--text);
+  font-family:'Raleway',sans-serif;
+  font-size:13px;
+  padding:9px 12px;
+  outline:none;
+  transition:border-color .2s;
+}
+.name-input:focus { border-color:var(--gold); }
+
+.btn-start {
+  background:linear-gradient(135deg,var(--gold),#c8952a);
+  border:none;
+  border-radius:10px;
+  color:#080600;
+  font-family:'Cinzel',serif;
+  font-size:15px;
+  font-weight:700;
+  letter-spacing:2px;
+  padding:14px;
+  cursor:pointer;
+  transition:all .2s;
+  box-shadow:0 4px 24px rgba(232,184,75,0.30);
+}
+.btn-start:hover { transform:translateY(-1px); box-shadow:0 6px 32px rgba(232,184,75,0.45); }
+.btn-start:active { transform:translateY(0); }
+
+/* ══ GAME SCREEN ═══════════════════════════════════════════════ */
+#screen-game {
+  flex-direction:row;
+  align-items:stretch;
+  min-height:100dvh;
+  gap:0;
+}
+
+/* ── Side Panels ── */
+.side-panel {
+  width:200px;
+  flex-shrink:0;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:16px 12px;
+  background:rgba(0,0,0,0.25);
+  border-right:1px solid var(--panel-border);
+  overflow-y:auto;
+}
+.side-panel.right {
+  border-right:none;
+  border-left:1px solid var(--panel-border);
+}
+
+.panel-block {
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:var(--radius);
+  padding:12px;
+  backdrop-filter:blur(10px);
+}
+.panel-block-title {
+  font-family:'Cinzel',serif;
+  font-size:9px;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:var(--text-dim);
+  margin-bottom:8px;
+}
+
+/* Clock */
+.clock-display {
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.clock-player {
+  border-radius:8px;
+  padding:8px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  border:1px solid transparent;
+  transition:all .3s;
+}
+.clock-player.gold-player { border-color:rgba(232,184,75,0.20); }
+.clock-player.silver-player { border-color:rgba(200,212,224,0.15); }
+.clock-player.active-clock {
+  background:rgba(255,255,255,0.06);
+  border-color:var(--gold);
+  box-shadow:0 0 12px rgba(232,184,75,0.20);
+}
+.clock-player.active-clock.silver-turn {
+  border-color:var(--silver);
+  box-shadow:0 0 12px rgba(200,212,224,0.20);
+}
+.clock-name { font-size:11px; font-weight:600; color:var(--text-dim); truncate:ellipsis; white-space:nowrap; overflow:hidden; max-width:80px; }
+.clock-name.gold { color:var(--gold); }
+.clock-name.silver { color:var(--silver); }
+.clock-time {
+  font-family:'Cinzel',serif;
+  font-size:18px;
+  font-weight:700;
+  letter-spacing:1px;
+  color:var(--text);
+  white-space:nowrap;
+}
+.clock-time.warning { color:#ff6b6b; animation:pulse-red .8s infinite; }
+@keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+/* Captured */
+.captured-row { min-height:22px; display:flex; flex-wrap:wrap; gap:2px; font-size:14px; line-height:1; }
+
+/* Material */
+.material-score {
+  font-family:'Cinzel',serif;
+  font-size:12px;
+  text-align:center;
+  margin-top:4px;
+}
+.mat-adv { color:var(--gold); }
+.mat-disadv { color:var(--silver); }
+
+/* Move History */
+.move-history {
+  flex:1;
+  overflow-y:auto;
+  font-size:12px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.move-history::-webkit-scrollbar { width:4px; }
+.move-history::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px; }
+.move-pair {
+  display:grid;
+  grid-template-columns:28px 1fr 1fr;
+  gap:2px;
+  padding:2px 4px;
+  border-radius:4px;
+}
+.move-pair:hover { background:rgba(255,255,255,0.04); }
+.move-num { color:var(--text-dim); font-size:11px; padding-top:1px; }
+.move-san {
+  padding:2px 4px;
+  border-radius:4px;
+  cursor:pointer;
+  color:var(--text);
+  font-size:12px;
+  font-weight:500;
+}
+.move-san:hover { background:rgba(255,255,255,0.08); }
+.move-san.current { background:var(--gold-dim); color:var(--gold); }
+
+/* ── Centre: Board Area ── */
+.board-area {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:16px 8px;
+  gap:10px;
+  min-width:0;
+}
+
+.player-bar {
+  width:calc(var(--sq)*8 + 24px);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 12px;
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:10px;
+  backdrop-filter:blur(10px);
+  gap:8px;
+}
+.player-bar.active-bar {
+  border-color:var(--gold);
+  box-shadow:0 0 16px rgba(232,184,75,0.18);
+}
+.player-bar.active-bar.silver-bar {
+  border-color:var(--silver);
+  box-shadow:0 0 16px rgba(200,212,224,0.18);
+}
+.pbar-name {
+  font-family:'Cinzel',serif;
+  font-size:13px;
+  font-weight:600;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:140px;
+}
+.pbar-name.gold { color:var(--gold); }
+.pbar-name.silver { color:var(--silver); }
+.pbar-caps { display:flex; flex-wrap:wrap; gap:1px; font-size:13px; flex:1; }
+.pbar-adv { font-family:'Cinzel',serif; font-size:11px; color:var(--gold); margin-left:auto; }
+.turn-dot {
+  width:8px; height:8px;
+  border-radius:50%;
+  background:var(--gold);
+  box-shadow:0 0 8px var(--gold-glow);
+  flex-shrink:0;
+  opacity:0;
+  transition:opacity .3s;
+}
+.turn-dot.silver-dot { background:var(--silver); box-shadow:0 0 8px var(--silver-glow); }
+.turn-dot.lit { opacity:1; }
+
+/* ── Board ── */
+.board-wrap {
+  position:relative;
+  display:inline-block;
+}
+.coords-col {
+  position:absolute;
+  left:-18px;
+  top:0;
+  height:calc(var(--sq)*8);
+  display:flex;
+  flex-direction:column;
+}
+.coords-row {
+  position:absolute;
+  bottom:-18px;
+  left:0;
+  width:calc(var(--sq)*8);
+  display:flex;
+}
+.coord {
+  font-size:10px;
+  color:var(--text-dim);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.coord-rank { width:18px; height:var(--sq); }
+.coord-file { width:var(--sq); height:18px; }
+
+#board {
+  display:grid;
+  grid-template-columns:repeat(8,var(--sq));
+  grid-template-rows:repeat(8,var(--sq));
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:4px;
+  overflow:hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.05),
+    0 8px 48px rgba(0,0,0,0.70),
+    0 0 80px rgba(232,184,75,0.06);
+}
+
+.sq {
+  width:var(--sq);
+  height:var(--sq);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  cursor:pointer;
+  transition:background .15s;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.sq.light { background:var(--sq-light); backdrop-filter:blur(6px); }
+.sq.dark  { background:var(--sq-dark);  backdrop-filter:blur(6px); }
+.sq.light::after, .sq.dark::after {
+  content:'';
+  position:absolute;
+  inset:0;
+  opacity:0;
+  transition:opacity .15s;
+  pointer-events:none;
+}
+
+.sq.selected { background:var(--sq-select)!important; }
+.sq.valid-move::after { opacity:1; background:var(--sq-valid); }
+.sq.valid-capture::after { opacity:1; background:rgba(220,80,80,0.30); }
+.sq.in-check { background:var(--sq-check)!important; }
+.sq.last-from { background:var(--sq-last-from)!important; }
+.sq.last-to   { background:var(--sq-last-to)!important; }
+.sq.strat-from { background:var(--sq-strat-from)!important; }
+.sq.strat-to   { background:var(--sq-strat-to)!important; }
+.sq:hover { filter:brightness(1.15); }
+
+.piece {
+  font-size:calc(var(--sq)*0.70);
+  line-height:1;
+  pointer-events:none;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,0.80));
+  transition:transform .1s;
+  z-index:1;
+  position:relative;
+}
+.piece.gold-piece {
+  color:var(--gold);
+  filter:drop-shadow(0 0 6px var(--gold-glow)) drop-shadow(0 2px 4px rgba(0,0,0,0.9));
+}
+.piece.silver-piece {
+  color:var(--silver);
+  filter:drop-shadow(0 0 5px var(--silver-glow)) drop-shadow(0 2px 4px rgba(0,0,0,0.9));
+}
+.sq.selected .piece { transform:scale(1.10); }
+
+/* ── Game Controls Bar ── */
+.game-controls {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:center;
+  width:calc(var(--sq)*8 + 24px);
+}
+.btn-ctrl {
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.10);
+  border-radius:8px;
+  color:var(--text);
+  font-family:'Raleway',sans-serif;
+  font-size:12px;
+  font-weight:500;
+  padding:6px 12px;
+  cursor:pointer;
+  transition:all .2s;
+  white-space:nowrap;
+}
+.btn-ctrl:hover { background:rgba(255,255,255,0.09); border-color:rgba(255,255,255,0.2); }
+.btn-ctrl.danger { border-color:rgba(220,60,60,0.30); color:#ff8080; }
+.btn-ctrl.danger:hover { background:rgba(220,60,60,0.12); }
+
+/* ── Strategy Panel (right side) ── */
+.strategy-panel {
+  background:rgba(160,100,255,0.05);
+  border:1px solid rgba(160,100,255,0.20);
+  border-radius:var(--radius);
+  padding:12px;
+}
+.strategy-name {
+  font-family:'Cinzel',serif;
+  font-size:12px;
+  font-weight:600;
+  color:var(--accent-purple);
+  margin-bottom:6px;
+}
+.strategy-desc {
+  font-size:11px;
+  color:var(--text-dim);
+  line-height:1.5;
+  margin-bottom:8px;
+}
+.strategy-suggestion {
+  background:rgba(160,100,255,0.10);
+  border:1px solid rgba(160,100,255,0.25);
+  border-radius:8px;
+  padding:8px;
+  font-size:11px;
+  line-height:1.5;
+}
+.sugg-move {
+  font-family:'Cinzel',serif;
+  font-size:13px;
+  color:var(--accent-purple);
+  font-weight:600;
+  margin-bottom:4px;
+}
+.sugg-why { color:var(--text-dim); }
+.btn-change-strategy {
+  width:100%;
+  margin-top:8px;
+  background:rgba(160,100,255,0.10);
+  border:1px solid rgba(160,100,255,0.25);
+  border-radius:8px;
+  color:var(--accent-purple);
+  font-family:'Raleway',sans-serif;
+  font-size:11px;
+  font-weight:600;
+  padding:6px;
+  cursor:pointer;
+  transition:all .2s;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+.btn-change-strategy:hover { background:rgba(160,100,255,0.18); }
+
+/* ── Status Bar ── */
+.status-bar {
+  font-family:'Cinzel',serif;
+  font-size:12px;
+  letter-spacing:1px;
+  color:var(--text-dim);
+  text-align:center;
+  min-height:18px;
+}
+
+/* ══ MODALS ════════════════════════════════════════════════════ */
+.modal-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.80);
+  backdrop-filter:blur(10px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+  padding:16px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s;
+}
+.modal-overlay.open { opacity:1; pointer-events:all; }
+.modal {
+  background:rgba(12,15,22,0.97);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:20px;
+  padding:28px 24px;
+  width:100%;
+  max-width:440px;
+  max-height:90dvh;
+  overflow-y:auto;
+}
+.modal-title {
+  font-family:'Cinzel',serif;
+  font-size:20px;
+  font-weight:700;
+  text-align:center;
+  margin-bottom:16px;
+  background:linear-gradient(135deg,var(--gold),var(--silver));
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.modal-sub {
+  font-size:13px;
+  color:var(--text-dim);
+  text-align:center;
+  margin-bottom:20px;
+  line-height:1.5;
+}
+
+/* Promotion */
+.promo-pieces {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-bottom:16px;
+}
+.promo-btn {
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px;
+  padding:12px 8px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:4px;
+  transition:all .2s;
+  color:var(--text);
+}
+.promo-btn:hover { background:var(--gold-dim); border-color:var(--gold); }
+.promo-piece-sym { font-size:32px; line-height:1; }
+.promo-piece-sym.gold-piece { color:var(--gold); filter:drop-shadow(0 0 6px var(--gold-glow)); }
+.promo-piece-sym.silver-piece { color:var(--silver); filter:drop-shadow(0 0 5px var(--silver-glow)); }
+.promo-label { font-size:11px; color:var(--text-dim); }
+
+/* Strategy Grid */
+.strategy-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:8px;
+  margin-bottom:16px;
+  max-height:60dvh;
+  overflow-y:auto;
+  padding-right:4px;
+}
+.strategy-card {
+  background:rgba(160,100,255,0.06);
+  border:1px solid rgba(160,100,255,0.15);
+  border-radius:10px;
+  padding:10px;
+  cursor:pointer;
+  transition:all .2s;
+}
+.strategy-card:hover { background:rgba(160,100,255,0.15); border-color:rgba(160,100,255,0.40); }
+.strategy-card.selected-card { background:rgba(160,100,255,0.20); border-color:var(--accent-purple); }
+.sc-num { font-size:10px; color:rgba(160,100,255,0.60); font-weight:600; margin-bottom:2px; }
+.sc-name { font-family:'Cinzel',serif; font-size:11px; font-weight:600; color:var(--accent-purple); margin-bottom:3px; }
+.sc-desc { font-size:10px; color:var(--text-dim); line-height:1.4; }
+
+/* Game Over */
+.result-icon { font-size:48px; text-align:center; margin-bottom:12px; }
+.modal-btns { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.btn-modal {
+  padding:10px 20px;
+  border-radius:10px;
+  font-family:'Raleway',sans-serif;
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  transition:all .2s;
+  border:none;
+}
+.btn-modal.primary {
+  background:linear-gradient(135deg,var(--gold),#c8952a);
+  color:#080600;
+}
+.btn-modal.secondary {
+  background:rgba(255,255,255,0.07);
+  border:1px solid rgba(255,255,255,0.12);
+  color:var(--text);
+}
+
+/* Draw offer */
+.btn-draw-accept { background:rgba(100,200,100,0.15); border:1px solid rgba(100,200,100,0.30); color:#7de87d; border-radius:8px; padding:7px 14px; cursor:pointer; font-family:'Raleway',sans-serif; font-size:12px; font-weight:600; transition:all .2s; }
+.btn-draw-accept:hover { background:rgba(100,200,100,0.25); }
+.btn-draw-decline { background:rgba(220,60,60,0.12); border:1px solid rgba(220,60,60,0.25); color:#ff8080; border-radius:8px; padding:7px 14px; cursor:pointer; font-family:'Raleway',sans-serif; font-size:12px; font-weight:600; transition:all .2s; }
+.btn-draw-decline:hover { background:rgba(220,60,60,0.22); }
+
+/* ══ MOBILE ════════════════════════════════════════════════════ */
+@media(max-width:700px){
+  :root { --sq: min(calc((100vw - 32px) / 8), calc((100dvh - 280px) / 8), 52px); }
+
+  #screen-game { flex-direction:column; overflow-y:auto; }
+  .side-panel { display:none; }
+  .board-area { padding:8px 8px 4px; gap:6px; justify-content:flex-start; }
+  .player-bar { width:calc(var(--sq)*8 + 20px); padding:6px 10px; }
+  .pbar-name { font-size:11px; max-width:100px; }
+  .game-controls { width:calc(var(--sq)*8 + 20px); gap:5px; }
+  .btn-ctrl { font-size:11px; padding:5px 9px; }
+
+  .mobile-strategy {
+    background:rgba(160,100,255,0.05);
+    border-top:1px solid rgba(160,100,255,0.15);
+    padding:10px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+
+  .strategy-grid { grid-template-columns:repeat(2,1fr); }
+  .modal { padding:20px 16px; }
+}
+
+@media(min-width:701px){
+  .mobile-strategy { display:none; }
+}
+
+/* ── Animations ── */
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+.fade-in { animation:fadeIn .3s ease forwards; }
+
+@keyframes bounceIn { 0%{transform:scale(.85);opacity:0} 60%{transform:scale(1.04)} 100%{transform:scale(1);opacity:1} }
+.bounce-in { animation:bounceIn .35s ease forwards; }
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP SCREEN ══════════════════════════════════════════ -->
+<div id="screen-setup" class="screen active">
+  <div class="logo">
+    <div class="logo-lounge">Nicky's Game Lounge</div>
+    <span class="logo-crown">♛</span>
+    <div class="logo-title">Royal Chess</div>
+  </div>
+
+  <div class="setup-card fade-in">
+    <!-- Mode -->
+    <div class="setup-section">
+      <div class="setup-label">Game Mode</div>
+      <div class="btn-group">
+        <button class="btn-opt active" data-group="mode" data-val="2p">2 Players</button>
+        <button class="btn-opt" data-group="mode" data-val="ai">vs Computer</button>
+      </div>
+    </div>
+
+    <!-- Difficulty (AI only) -->
+    <div class="setup-section" id="diff-group">
+      <div class="setup-label">Difficulty</div>
+      <div class="btn-group" id="diff-btns">
+        <button class="btn-opt" data-group="diff" data-val="easy">Easy</button>
+        <button class="btn-opt active" data-group="diff" data-val="medium">Medium</button>
+        <button class="btn-opt" data-group="diff" data-val="hard">Hard</button>
+        <button class="btn-opt" data-group="diff" data-val="expert">Expert</button>
+      </div>
+    </div>
+
+    <!-- Play as (AI only) -->
+    <div class="setup-section" id="color-group">
+      <div class="setup-label">Play As</div>
+      <div class="btn-group">
+        <button class="btn-opt active" data-group="color" data-val="W">⬡ Gold (White)</button>
+        <button class="btn-opt active-silver" data-group="color" data-val="B">⬡ Silver (Black)</button>
+      </div>
+    </div>
+
+    <!-- Strategy (AI only) -->
+    <div class="setup-section" id="strategy-opt">
+      <div class="setup-label">Strategy Advisor</div>
+      <div class="btn-group">
+        <button class="btn-opt" data-group="strategy" data-val="no">Off</button>
+        <button class="btn-opt active" data-group="strategy" data-val="yes">On — Pick a Strategy</button>
+      </div>
+    </div>
+
+    <!-- Clock -->
+    <div class="setup-section">
+      <div class="setup-label">Chess Clock</div>
+      <div class="btn-group">
+        <button class="btn-opt active" data-group="clock" data-val="none">No Clock</button>
+        <button class="btn-opt" data-group="clock" data-val="timed">Timed</button>
+      </div>
+    </div>
+
+    <!-- Clock presets -->
+    <div class="setup-section hidden" id="clock-opts">
+      <div class="setup-label">Time Control</div>
+      <div class="clock-grid">
+        <button class="btn-opt" data-group="tc" data-val="60,0">1+0 Bullet</button>
+        <button class="btn-opt" data-group="tc" data-val="180,2">3+2 Blitz</button>
+        <button class="btn-opt active" data-group="tc" data-val="300,0">5+0 Blitz</button>
+        <button class="btn-opt" data-group="tc" data-val="600,0">10+0 Rapid</button>
+        <button class="btn-opt" data-group="tc" data-val="900,10">15+10 Rapid</button>
+        <button class="btn-opt" data-group="tc" data-val="1800,0">30+0 Classical</button>
+      </div>
+    </div>
+
+    <!-- Names -->
+    <div class="setup-section">
+      <div class="setup-label">Player Names</div>
+      <div class="player-names">
+        <div class="name-input-wrap">
+          <div class="name-label gold">♔ Gold</div>
+          <input class="name-input" id="name-gold" type="text" placeholder="Gold Player" maxlength="16">
+        </div>
+        <div class="name-input-wrap">
+          <div class="name-label silver">♚ Silver</div>
+          <input class="name-input" id="name-silver" type="text" placeholder="Silver Player" maxlength="16">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-start" id="btn-start-game">BEGIN GAME ♟</button>
+  </div>
+</div>
+
+<!-- ══ GAME SCREEN ═══════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+  <!-- Left Panel: Move History -->
+  <div class="side-panel left-panel">
+    <div class="panel-block" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+      <div class="panel-block-title">Move History</div>
+      <div class="move-history" id="move-history"></div>
+    </div>
+    <div class="panel-block">
+      <div class="panel-block-title">Material</div>
+      <div class="captured-row" id="cap-gold-side" style="margin-bottom:4px;"></div>
+      <div class="captured-row" id="cap-silver-side"></div>
+      <div class="material-score" id="mat-score"></div>
+    </div>
+  </div>
+
+  <!-- Centre: Board Area -->
+  <div class="board-area">
+    <!-- Top player bar (Silver by default) -->
+    <div class="player-bar" id="bar-top">
+      <span class="turn-dot silver-dot" id="dot-top"></span>
+      <span class="pbar-name silver" id="pbar-top-name">Silver</span>
+      <span class="pbar-caps" id="pbar-top-caps"></span>
+      <span class="pbar-adv" id="pbar-top-adv"></span>
+    </div>
+
+    <!-- Board -->
+    <div class="board-wrap">
+      <div class="coords-col" id="coords-ranks"></div>
+      <div id="board"></div>
+      <div class="coords-row" id="coords-files"></div>
+    </div>
+
+    <!-- Bottom player bar (Gold by default) -->
+    <div class="player-bar" id="bar-bottom">
+      <span class="turn-dot" id="dot-bottom"></span>
+      <span class="pbar-name gold" id="pbar-bottom-name">Gold</span>
+      <span class="pbar-caps" id="pbar-bottom-caps"></span>
+      <span class="pbar-adv" id="pbar-bottom-adv"></span>
+    </div>
+
+    <!-- Controls -->
+    <div class="game-controls">
+      <button class="btn-ctrl" id="btn-flip">⇅ Flip</button>
+      <button class="btn-ctrl" id="btn-draw">½ Draw</button>
+      <button class="btn-ctrl danger" id="btn-resign">⚑ Resign</button>
+      <button class="btn-ctrl" id="btn-new">✦ New Game</button>
+    </div>
+    <div class="status-bar" id="status-bar"></div>
+  </div>
+
+  <!-- Right Panel: Clock + Strategy -->
+  <div class="side-panel right-panel">
+    <div class="panel-block" id="clock-panel">
+      <div class="panel-block-title">Clock</div>
+      <div class="clock-display">
+        <div class="clock-player silver-player" id="clock-silver">
+          <span class="clock-name silver" id="clock-silver-name">Silver</span>
+          <span class="clock-time" id="clock-silver-time">—</span>
+        </div>
+        <div class="clock-player gold-player" id="clock-gold">
+          <span class="clock-name gold" id="clock-gold-name">Gold</span>
+          <span class="clock-time" id="clock-gold-time">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-block strategy-panel" id="strat-panel" style="display:none;">
+      <div class="panel-block-title">Strategy Advisor</div>
+      <div class="strategy-name" id="strat-name"></div>
+      <div class="strategy-desc" id="strat-desc"></div>
+      <div class="strategy-suggestion" id="strat-sugg" style="display:none;">
+        <div class="sugg-move" id="sugg-move"></div>
+        <div class="sugg-why" id="sugg-why"></div>
+      </div>
+      <button class="btn-change-strategy" id="btn-change-strat">Change Strategy</button>
+    </div>
+  </div>
+
+  <!-- Mobile Strategy (below board) -->
+  <div class="mobile-strategy" id="mobile-strat" style="display:none;">
+    <div class="strategy-name" id="m-strat-name"></div>
+    <div class="strategy-suggestion" id="m-strat-sugg" style="display:none;">
+      <div class="sugg-move" id="m-sugg-move"></div>
+      <div class="sugg-why" id="m-sugg-why"></div>
+    </div>
+    <button class="btn-change-strategy" id="m-btn-change-strat">Change Strategy</button>
+  </div>
+</div>
+
+<!-- ══ MODALS ═══════════════════════════════════════════════ -->
+
+<!-- Promotion -->
+<div class="modal-overlay" id="modal-promo">
+  <div class="modal bounce-in">
+    <div class="modal-title">Promote Pawn</div>
+    <div class="modal-sub">Choose your piece</div>
+    <div class="promo-pieces" id="promo-choices"></div>
+  </div>
+</div>
+
+<!-- Strategy Picker -->
+<div class="modal-overlay" id="modal-strategy">
+  <div class="modal bounce-in">
+    <div class="modal-title">Choose a Strategy</div>
+    <div class="modal-sub">Your advisor will suggest moves that align with this strategy and explain why each move is strong.</div>
+    <div class="strategy-grid" id="strategy-grid"></div>
+    <div class="modal-btns">
+      <button class="btn-modal secondary" id="btn-strat-cancel">Cancel</button>
+      <button class="btn-modal primary" id="btn-strat-confirm">Confirm Strategy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div class="modal-overlay" id="modal-gameover">
+  <div class="modal bounce-in">
+    <div class="result-icon" id="result-icon"></div>
+    <div class="modal-title" id="result-title"></div>
+    <div class="modal-sub" id="result-sub"></div>
+    <div class="modal-btns">
+      <button class="btn-modal primary" id="btn-rematch">Rematch</button>
+      <button class="btn-modal secondary" id="btn-menu">Main Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Draw Offer -->
+<div class="modal-overlay" id="modal-draw">
+  <div class="modal bounce-in">
+    <div class="modal-title">Draw Offered</div>
+    <div class="modal-sub" id="draw-offer-msg"></div>
+    <div class="modal-btns">
+      <button class="btn-draw-accept" id="btn-draw-accept">Accept Draw</button>
+      <button class="btn-draw-decline" id="btn-draw-decline">Decline</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   ROYAL CHESS — Full Implementation
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── CONSTANTS ─────────────────────────────────────────────── */
+const EMPTY = null;
+const W='W', B='B';
+const PIECES = {P:1,N:2,B:3,R:4,Q:5,K:6};
+const VAL = {P:100,N:320,B:330,R:500,Q:900,K:20000};
+
+// Unicode symbols
+const SYM = {
+  WK:'♔',WQ:'♕',WR:'♖',WB:'♗',WN:'♘',WP:'♙',
+  BK:'♚',BQ:'♛',BR:'♜',BB:'♝',BN:'♞',BP:'♟'
+};
+
+// Piece-Square Tables (from white's perspective, a1=bottom-left)
+const PST = {
+  P: [
+     0, 0, 0, 0, 0, 0, 0, 0,
+    50,50,50,50,50,50,50,50,
+    10,10,20,30,30,20,10,10,
+     5, 5,10,25,25,10, 5, 5,
+     0, 0, 0,20,20, 0, 0, 0,
+     5,-5,-10, 0, 0,-10,-5, 5,
+     5,10,10,-20,-20,10,10, 5,
+     0, 0, 0, 0, 0, 0, 0, 0
+  ],
+  N: [
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50
+  ],
+  B: [
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20
+  ],
+  R: [
+     0, 0, 0, 0, 0, 0, 0, 0,
+     5,10,10,10,10,10,10, 5,
+    -5, 0, 0, 0, 0, 0, 0,-5,
+    -5, 0, 0, 0, 0, 0, 0,-5,
+    -5, 0, 0, 0, 0, 0, 0,-5,
+    -5, 0, 0, 0, 0, 0, 0,-5,
+    -5, 0, 0, 0, 0, 0, 0,-5,
+     0, 0, 0, 5, 5, 0, 0, 0
+  ],
+  Q: [
+    -20,-10,-10,-5,-5,-10,-10,-20,
+    -10,  0,  0, 0, 0,  0,  0,-10,
+    -10,  0,  5, 5, 5,  5,  0,-10,
+     -5,  0,  5, 5, 5,  5,  0, -5,
+      0,  0,  5, 5, 5,  5,  0, -5,
+    -10,  5,  5, 5, 5,  5,  0,-10,
+    -10,  0,  5, 0, 0,  0,  0,-10,
+    -20,-10,-10,-5,-5,-10,-10,-20
+  ],
+  KMG: [
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+     20, 20,  0,  0,  0,  0, 20, 20,
+     20, 30, 10,  0,  0, 10, 30, 20
+  ],
+  KEG: [
+    -50,-40,-30,-20,-20,-30,-40,-50,
+    -30,-20,-10,  0,  0,-10,-20,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 30, 40, 40, 30,-10,-30,
+    -30,-10, 20, 30, 30, 20,-10,-30,
+    -30,-30,  0,  0,  0,  0,-30,-30,
+    -50,-30,-30,-30,-30,-30,-30,-50
+  ]
+};
+
+function getPST(pt,color,row,col){
+  // row 0=top(rank8), convert to white-perspective index
+  const r = color===W ? row : 7-row;
+  const c = color===W ? col : 7-col;
+  const idx = r*8+c;
+  if(pt==='K') return PST.KMG[idx];
+  return (PST[pt]||PST.P)[idx];
+}
+
+/* ── TOP 20 STRATEGIES ─────────────────────────────────────── */
+const STRATEGIES = [
+  {
+    id:0, name:"Control the Center",
+    desc:"Dominate the four central squares (e4, d4, e5, d5). Pieces placed near the center control more of the board, limit your opponent's options, and can pivot quickly to either flank. This is the foundation upon which most opening theory is built.",
+    scoreMove:(board,m,turn)=>{
+      const center=[[3,3],[3,4],[4,3],[4,4]];
+      let s=0;
+      center.forEach(([r,c])=>{ if(m.tr===r&&m.tc===c) s+=60; else if(Math.abs(m.tr-r)+Math.abs(m.tc-c)===1) s+=20; });
+      // Bonus for pawn e4/d4
+      const p=board[m.fr][m.fc];
+      if(p&&p[1]==='P') s+=15;
+      return s;
+    },
+    narrative:(from,to)=>`Moving to ${to} plants a piece in or near the heart of the board, restricting your opponent's mobility and maximizing your piece's influence over both flanks.`
+  },
+  {
+    id:1, name:"Rapid Development",
+    desc:"Get your minor pieces (knights and bishops) off the back rank quickly, then castle. Every tempo spent moving a piece twice in the opening is a tempo your opponent can use to seize the initiative. Develop with purpose—toward the center.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p) return 0;
+      const backRank = turn===W?7:0;
+      if(m.fr===backRank&&(p[1]==='N'||p[1]==='B')) return 70;
+      if(p[1]==='N'||p[1]==='B') return 10;
+      return 0;
+    },
+    narrative:(from,to)=>`Developing your piece from ${from} to ${to} brings more firepower to the board. Each minor piece deployed is a soldier joining the battle—idle pieces cost you the game.`
+  },
+  {
+    id:2, name:"King Safety — Castle Early",
+    desc:"The king is vulnerable in the center. Castling tucks your king behind a wall of pawns, activates your rook, and typically removes your king from the battlefield until the endgame. Castle before your opponent can open lines toward your king.",
+    scoreMove:(board,m,turn)=>{
+      // Bonus for castling moves
+      const p=board[m.fr][m.fc];
+      if(p&&p[1]==='K'&&Math.abs(m.tc-m.fc)===2) return 200;
+      // Bonus for moves that clear the castling corridor
+      if(p&&(p[1]==='N'||p[1]==='B')&&m.fr===(turn===W?7:0)) return 30;
+      return 0;
+    },
+    narrative:(from,to)=>`This move ${m&&m.castle?'castles your king to safety':'clears the path for castling'}, sheltering your king and activating your rook. A safe king wins endgames.`
+  },
+  {
+    id:3, name:"The Pin",
+    desc:"A pin immobilizes a piece because moving it would expose a more valuable piece (often the king) behind it. Bishops and rooks excel at creating pins. Pinned pieces are paralyzed defenders—exploit them by attacking the pinned piece with pawns or minor pieces.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p) return 0;
+      let s=0;
+      const opp=turn===W?B:W;
+      // Check if this piece now attacks along a line through opponent pieces toward their king
+      if(p[1]==='B'||p[1]==='Q'){
+        const dirs=[[-1,-1],[-1,1],[1,-1],[1,1]];
+        for(const [dr,dc] of dirs){
+          let r=m.tr+dr,c=m.tc+dc,found=null;
+          while(r>=0&&r<8&&c>=0&&c<8){
+            const sq=board[r][c];
+            if(sq){
+              if(sq[0]===opp&&!found) found=sq;
+              else if(sq[0]===opp&&found&&sq[1]==='K') s+=80;
+              else break;
+            }
+            r+=dr;c+=dc;
+          }
+        }
+      }
+      if(p[1]==='R'||p[1]==='Q'){
+        const dirs=[[-1,0],[1,0],[0,-1],[0,1]];
+        for(const [dr,dc] of dirs){
+          let r=m.tr+dr,c=m.tc+dc,found=null;
+          while(r>=0&&r<8&&c>=0&&c<8){
+            const sq=board[r][c];
+            if(sq){
+              if(sq[0]===opp&&!found) found=sq;
+              else if(sq[0]===opp&&found&&sq[1]==='K') s+=80;
+              else break;
+            }
+            r+=dr;c+=dc;
+          }
+        }
+      }
+      return s;
+    },
+    narrative:(from,to)=>`Sliding to ${to} creates a pin along an open line. The pinned piece is frozen—you can pile pressure on it while your opponent struggles to free it.`
+  },
+  {
+    id:4, name:"The Fork",
+    desc:"A fork attacks two or more of your opponent's pieces simultaneously with a single piece. Knights are the master forkers due to their L-shaped movement, but queens, rooks, bishops, and even pawns can fork. The opponent can only save one piece.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p) return 0;
+      const opp=turn===W?B:W;
+      // Count opponent pieces attacked from target square
+      const attacks=getAttacksFrom(board,m.tr,m.tc,p[1],turn);
+      let hits=0;
+      attacks.forEach(([r,c])=>{ if(board[r][c]&&board[r][c][0]===opp&&board[r][c][1]!=='P') hits++; });
+      return hits>=2?100*hits:hits===1&&board[m.tc]?20:0;
+    },
+    narrative:(from,to)=>`Landing on ${to} attacks multiple enemy pieces at once. Your opponent can only rescue one—you win the other. The fork is chess's most satisfying tactic.`
+  },
+  {
+    id:5, name:"The Skewer",
+    desc:"The inverse of a pin: you attack a valuable piece directly, forcing it to move, which exposes a less valuable piece behind it. Like a pin that can't be maintained, the skewer forces your opponent to lose material when they flee.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p||(p[1]!=='B'&&p[1]!=='R'&&p[1]!=='Q')) return 0;
+      const opp=turn===W?B:W;
+      let s=0;
+      const dirs = p[1]==='B'?[[-1,-1],[-1,1],[1,-1],[1,1]]:
+                   p[1]==='R'?[[-1,0],[1,0],[0,-1],[0,1]]:
+                   [[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]];
+      for(const [dr,dc] of dirs){
+        let r=m.tr+dr,c=m.tc+dc,first=null;
+        while(r>=0&&r<8&&c>=0&&c<8){
+          const sq=board[r][c];
+          if(sq){
+            if(sq[0]===opp&&!first){ first=sq; }
+            else if(sq[0]===opp&&first){
+              if(VAL[first[1]]>VAL[sq[1]]) s+=60;
+              break;
+            } else break;
+          }
+          r+=dr;c+=dc;
+        }
+      }
+      return s;
+    },
+    narrative:(from,to)=>`Placing your piece on ${to} skewers an enemy piece—when it runs, the piece hiding behind it falls. The skewer forces your opponent into a losing choice.`
+  },
+  {
+    id:6, name:"Discovered Attack",
+    desc:"Move one piece to reveal an attack by a second piece behind it. The moving piece can threaten something too, creating two simultaneous threats. Discovered attacks are particularly deadly because they're hard to see coming and often impossible to defend against in one move.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p) return 0;
+      const opp=turn===W?B:W;
+      let s=0;
+      // Check if moving reveals a line piece attack
+      const dirs=[[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]];
+      for(const [dr,dc] of dirs){
+        let r=m.fr+dr,c=m.fc+dc;
+        // Find our own line piece in this direction
+        while(r>=0&&r<8&&c>=0&&c<8){
+          const sq=board[r][c];
+          if(sq){
+            if(sq[0]===turn&&(sq[1]==='R'||sq[1]==='B'||sq[1]==='Q')){
+              // This piece was blocked by our moving piece—does it now have targets?
+              s+=40; break;
+            } else break;
+          }
+          r+=dr;c+=dc;
+        }
+      }
+      return s;
+    },
+    narrative:(from,to)=>`Moving from ${from} unveils a hidden attacker behind it. The discovered piece strikes while your moving piece may threaten something too—double trouble for your opponent.`
+  },
+  {
+    id:7, name:"Open Files for Rooks",
+    desc:"Rooks are most powerful on open files (no pawns) or semi-open files (only enemy pawns). Double your rooks on an open file to create a battery, or occupy the seventh rank to wreak havoc on your opponent's back pawns and restrict their king.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p) return 0;
+      let s=0;
+      if(p[1]==='R'){
+        // Check if target file is open
+        let open=true,semi=true;
+        for(let r=0;r<8;r++){
+          const sq=board[r][m.tc];
+          if(sq&&sq[1]==='P'){
+            if(sq[0]===turn) open=false;
+            semi=false;
+          }
+        }
+        if(open) s+=70;
+        else if(semi) s+=40;
+        // 7th rank bonus
+        if((turn===W&&m.tr===1)||(turn===B&&m.tr===6)) s+=50;
+      }
+      return s;
+    },
+    narrative:(from,to)=>`Placing your rook on ${to} claims an open file. Rooks are sleeping giants—wake them up on open lines where they dominate the board and invade enemy territory.`
+  },
+  {
+    id:8, name:"Bishop Pair Advantage",
+    desc:"Two bishops working together control diagonals of both colors, creating a formidable team in open positions. The bishop pair is worth roughly half a pawn more than any other minor piece combination. Keep your bishops, trade your opponent's.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p) return 0;
+      let s=0;
+      if(p[1]==='B'){
+        // Bonus for active bishop on long diagonal
+        const onLongDiag=(m.tr+m.tc===7)||(m.tr===m.tc);
+        if(onLongDiag) s+=50;
+        // Count open squares on diagonal
+        s+=20;
+      }
+      // Avoid trading bishop unless favorable
+      if(p[1]==='B'&&board[m.tr][m.tc]&&board[m.tr][m.tc][1]==='N') s-=20;
+      return s;
+    },
+    narrative:(from,to)=>`Activating your bishop on ${to} leverages the power of the bishop pair. Open diagonals are highways for bishops—keep them firing on all cylinders.`
+  },
+  {
+    id:9, name:"Knight Outpost",
+    desc:"An outpost is a square that cannot be attacked by enemy pawns. A knight planted on an outpost in the opponent's territory is enormously powerful—it can't be chased away and radiates control over surrounding squares. Good outposts are often worth more than a rook.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p||p[1]!=='N') return 0;
+      const opp=turn===W?B:W;
+      // Is target square not attackable by opponent pawns?
+      const pawnDir=turn===W?1:-1;
+      const r1=m.tr+pawnDir,c1=m.tc-1,c2=m.tc+1;
+      let attacked=false;
+      if(r1>=0&&r1<8){
+        if(c1>=0&&board[r1][c1]&&board[r1][c1]===opp+'P') attacked=true;
+        if(c2<8&&board[r1][c2]&&board[r1][c2]===opp+'P') attacked=true;
+      }
+      if(attacked) return 0;
+      // Central/advanced bonus
+      const advancement=turn===W?7-m.tr:m.tr;
+      const centralBonus=Math.max(0,3-Math.abs(m.tc-3.5)-Math.abs(m.tr-3.5))*10;
+      return 60+advancement*10+centralBonus;
+    },
+    narrative:(from,to)=>`Your knight on ${to} is an outpost—it can't be chased by enemy pawns. A knight deeply entrenched in enemy territory is worth its weight in gold.`
+  },
+  {
+    id:10, name:"Pawn Chain Strategy",
+    desc:"Build interlocking pawn chains where each pawn protects the one in front. A pawn chain is structurally sound and hard to break. Attack the base of your opponent's chain while protecting your own. The chain's head advances, the tail protects.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p||p[1]!=='P') return 0;
+      // Check if pawn would be supported by another pawn
+      const supportDir=turn===W?1:-1;
+      let s=15;
+      if(m.tr+supportDir>=0&&m.tr+supportDir<8){
+        if(m.tc>0&&board[m.tr+supportDir][m.tc-1]===turn+'P') s+=40;
+        if(m.tc<7&&board[m.tr+supportDir][m.tc+1]===turn+'P') s+=40;
+      }
+      return s;
+    },
+    narrative:(from,to)=>`Advancing to ${to} extends your pawn chain, creating a mutually supporting structure. Chains control space and are remarkably difficult for the opponent to dismantle.`
+  },
+  {
+    id:11, name:"Target Isolated Pawns",
+    desc:"Isolated pawns (no friendly pawns on adjacent files) are permanent weaknesses. They can't be defended by other pawns and require pieces to protect them. Identify your opponent's isolated pawns and maneuver pieces to attack them relentlessly.",
+    scoreMove:(board,m,turn)=>{
+      const opp=turn===W?B:W;
+      // Find isolated enemy pawns and move toward them
+      let s=0;
+      for(let c=0;c<8;c++){
+        let hasOppPawn=false;
+        let hasAdjPawn=false;
+        for(let r=0;r<8;r++) if(board[r][c]===opp+'P') hasOppPawn=true;
+        if(!hasOppPawn) continue;
+        if(c>0) for(let r=0;r<8;r++) if(board[r][c-1]===opp+'P') hasAdjPawn=true;
+        if(c<7) for(let r=0;r<8;r++) if(board[r][c+1]===opp+'P') hasAdjPawn=true;
+        if(!hasAdjPawn){
+          // isolated pawn on file c; bonus for moving toward it
+          const dist=Math.abs(m.tc-c);
+          s+=Math.max(0,50-dist*10);
+        }
+      }
+      return s;
+    },
+    narrative:(from,to)=>`This move targets an isolated enemy pawn—a permanent weakness that requires a piece to guard it. Pile pressure on isolated pawns; they'll drain your opponent's resources.`
+  },
+  {
+    id:12, name:"Passed Pawn Push",
+    desc:"A passed pawn has no enemy pawns blocking it or on adjacent files. Every step it advances, it becomes more threatening. In the endgame, a passed pawn that promotes is decisive. Protect it with your king and rooks, and march it forward.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p||p[1]!=='P') return 0;
+      const opp=turn===W?B:W;
+      // Is it a passed pawn? Check for enemy pawns ahead and on adjacent files
+      let passed=true;
+      const dir=turn===W?-1:1;
+      let r=m.tr+dir;
+      while(r>=0&&r<8){
+        if(board[r][m.tc]&&board[r][m.tc][0]===opp) { passed=false; break; }
+        if(m.tc>0&&board[r][m.tc-1]&&board[r][m.tc-1]===opp+'P') { passed=false; break; }
+        if(m.tc<7&&board[r][m.tc+1]&&board[r][m.tc+1]===opp+'P') { passed=false; break; }
+        r+=dir;
+      }
+      if(!passed) return 0;
+      const advancement=turn===W?7-m.tr:m.tr;
+      return 50+advancement*15;
+    },
+    narrative:(from,to)=>`Pushing this passed pawn to ${to} brings it one step closer to promotion. Passed pawns are ticking time bombs—every advance creates new threats your opponent must scramble to meet.`
+  },
+  {
+    id:13, name:"Exchange Sacrifice",
+    desc:"Sometimes sacrificing a rook for a bishop or knight (losing material) gains positional compensation that's worth more—perhaps a dominant knight, shattered enemy pawns, or a crushing attack. Exchange sacrifices require concrete calculation but can unlock positions that pieces alone cannot.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p||p[1]!=='R') return 0;
+      const target=board[m.tr][m.tc];
+      if(!target||(target[1]!=='N'&&target[1]!=='B')) return 0;
+      // Check if the resulting position gives positional compensation
+      // Simplified: bonus if our rook captures a well-placed minor piece
+      const centralBonus=Math.max(0,3-Math.abs(m.tc-3.5)-Math.abs(m.tr-3.5))*15;
+      return 30+centralBonus;
+    },
+    narrative:(from,to)=>`This exchange sacrifice trades material for positional dominance. Sacrificing the exchange for that piece destroys your opponent's coordination—sometimes position beats raw material.`
+  },
+  {
+    id:14, name:"Kingside Attack",
+    desc:"Launch your pawns and pieces at the opponent's king, typically on the kingside (f, g, h files). The h2-h4-h5 pawn storm, a bishop on the long diagonal, and a rook on an open h-file can devastate the enemy king. Attack before your opponent consolidates.",
+    scoreMove:(board,m,turn)=>{
+      // Bonus for moves toward opponent king's side
+      const opp=turn===W?B:W;
+      let kingCol=4;
+      outer: for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(board[r][c]===opp+'K'){kingCol=c;break outer;}
+      const dist=Math.abs(m.tc-kingCol)+Math.abs(m.tr-(turn===W?0:7));
+      let s=Math.max(0,40-dist*6);
+      // Kingside pawn storm bonus
+      const p=board[m.fr][m.fc];
+      if(p&&p[1]==='P'&&m.tc>=4) s+=20;
+      return s;
+    },
+    narrative:(from,to)=>`This move advances your kingside attack. Every piece and pawn closing in on the enemy king adds pressure. Attack with tempo—give your opponent no time to breathe.`
+  },
+  {
+    id:15, name:"Prophylaxis",
+    desc:"Think like your opponent. Before you move, ask: what is my opponent threatening next? A prophylactic move prevents the opponent's best plan before it can be executed. It's not flashy, but masters use it constantly to neutralize threats and maintain positional equilibrium.",
+    scoreMove:(board,m,turn)=>{
+      const opp=turn===W?B:W;
+      // Bonus for moves that take away squares from opponent pieces
+      let s=0;
+      const oppMoves=getAllMovesSimple(board,opp);
+      // If our move blocks or reduces a good opponent square, bonus
+      oppMoves.forEach(om=>{
+        if(om.tr===m.tr&&om.tc===m.tc) s+=8;
+      });
+      return Math.min(s,70);
+    },
+    narrative:(from,to)=>`Moving to ${to} is prophylaxis—you're preventing your opponent's best plan before it develops. Masters play prophylaxis constantly; it's invisible but decisive.`
+  },
+  {
+    id:16, name:"Activate Your Worst Piece",
+    desc:"At any point in the game, identify your worst-placed piece (lowest activity, stuck behind pawns, on the rim) and improve it. A single tempo spent activating an idle piece can be more valuable than a tactical threat that leads nowhere.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p) return 0;
+      const before=getPST(p[1]==='K'?'K':p[1],turn,m.fr,m.fc);
+      const after=getPST(p[1]==='K'?'K':p[1],turn,m.tr,m.tc);
+      const improvement=after-before;
+      // Find the minimum PST improvement across all our pieces
+      let minPST=999;
+      for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+        const sq=board[r][c];
+        if(sq&&sq[0]===turn) minPST=Math.min(minPST,getPST(sq[1]==='K'?'K':sq[1],turn,r,c));
+      }
+      // Bonus if this piece was the worst-placed
+      const wasWorst=getPST(p[1]==='K'?'K':p[1],turn,m.fr,m.fc)<=minPST+5;
+      return wasWorst?Math.max(0,improvement*2):Math.max(0,improvement/2);
+    },
+    narrative:(from,to)=>`Relocating from ${from} to ${to} transforms your worst piece into an active participant. An idle army loses wars—every piece should have a purpose.`
+  },
+  {
+    id:17, name:"Minority Attack",
+    desc:"Advance fewer pawns (the minority) against a larger pawn majority to create weaknesses in the opponent's structure. Classic in IQP (isolated queen's pawn) positions: push b4-b5-bxc6 to leave your opponent with isolated or doubled pawns on the queenside.",
+    scoreMove:(board,m,turn)=>{
+      const p=board[m.fr][m.fc];
+      if(!p||p[1]!=='P') return 0;
+      // Queenside pawn advance bonus (files a,b,c = cols 0,1,2)
+      if(m.tc<=2){
+        const advancement=turn===W?7-m.tr:m.tr;
+        return 30+advancement*12;
+      }
+      return 0;
+    },
+    narrative:(from,to)=>`Advancing your queenside pawn to ${to} begins the minority attack. You'll use fewer pawns to create lasting weaknesses in the opponent's majority—a long-term strategic weapon.`
+  },
+  {
+    id:18, name:"Fortress Defense",
+    desc:"When under pressure, build a fortress—a defensive setup so solid that the opponent cannot break through even with material advantage. Coordinate your pieces in a tight defensive matrix, place your king actively if it's an endgame, and deny all entry points.",
+    scoreMove:(board,m,turn)=>{
+      const opp=turn===W?B:W;
+      // Find our king
+      let kr=4,kc=4;
+      for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(board[r][c]===turn+'K'){kr=r;kc=c;}
+      // Bonus for moves near own king
+      const dist=Math.abs(m.tr-kr)+Math.abs(m.tc-kc);
+      return Math.max(0,50-dist*8);
+    },
+    narrative:(from,to)=>`Repositioning to ${to} tightens your defensive fortress around the king. A solid defense denies your opponent any breakthrough—sometimes the best offense is an impenetrable defense.`
+  },
+  {
+    id:19, name:"Zwischenzug (In-Between Move)",
+    desc:"Before recapturing or making an expected move, insert an intermediate move—a check, capture, or threat—that changes the position favorably. Your opponent expects your reply; instead you play something unexpected that wins material or improves your position before completing the sequence.",
+    scoreMove:(board,m,turn)=>{
+      let s=0;
+      // Bonus for checks
+      const opp=turn===W?B:W;
+      const testBoard=applyMoveSimple(board,m);
+      if(isInCheck(testBoard,opp)) s+=80;
+      // Bonus for captures that aren't the expected recapture
+      if(board[m.tr][m.tc]) s+=30;
+      return s;
+    },
+    narrative:(from,to)=>`Instead of the expected reply, you play ${to}—an in-between move! This zwischenzug forces your opponent to react to a new threat before they can execute their plan.`
+  }
+];
+
+/* ── BOARD UTILITIES ───────────────────────────────────────── */
+function initBoard(){
+  const b=Array.from({length:8},()=>Array(8).fill(null));
+  const back=['R','N','B','Q','K','B','N','R'];
+  back.forEach((p,c)=>{ b[0][c]='B'+p; b[7][c]='W'+p; });
+  for(let c=0;c<8;c++){ b[1][c]='BP'; b[6][c]='WP'; }
+  return b;
+}
+
+function copyBoard(b){ return b.map(r=>[...r]); }
+
+function getAttacksFrom(board,r,c,pt,color){
+  const res=[];
+  const opp=color===W?B:W;
+  const add=(rr,cc)=>{ if(rr>=0&&rr<8&&cc>=0&&cc<8) res.push([rr,cc]); };
+  if(pt==='P'){
+    const dir=color===W?-1:1;
+    add(r+dir,c-1); add(r+dir,c+1);
+  } else if(pt==='N'){
+    [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]
+      .forEach(([dr,dc])=>add(r+dr,c+dc));
+  } else if(pt==='K'){
+    for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++) if(dr||dc) add(r+dr,c+dc);
+  } else {
+    const dirs=pt==='B'?[[-1,-1],[-1,1],[1,-1],[1,1]]:
+               pt==='R'?[[-1,0],[1,0],[0,-1],[0,1]]:
+               [[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]];
+    for(const [dr,dc] of dirs){
+      let rr=r+dr,cc=c+dc;
+      while(rr>=0&&rr<8&&cc>=0&&cc<8){
+        res.push([rr,cc]);
+        if(board[rr][cc]) break;
+        rr+=dr;cc+=dc;
+      }
+    }
+  }
+  return res;
+}
+
+function isAttacked(board,r,c,byColor){
+  for(let rr=0;rr<8;rr++){
+    for(let cc=0;cc<8;cc++){
+      const p=board[rr][cc];
+      if(!p||p[0]!==byColor) continue;
+      const atks=getAttacksFrom(board,rr,cc,p[1],byColor);
+      if(atks.some(([ar,ac])=>ar===r&&ac===c)) return true;
+    }
+  }
+  return false;
+}
+
+function isInCheck(board,color){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    if(board[r][c]===color+'K') return isAttacked(board,r,c,color===W?B:W);
+  return false;
+}
+
+function getPseudoLegalMoves(board,r,c,gs){
+  const p=board[r][c];
+  if(!p) return [];
+  const color=p[0],pt=p[1];
+  const opp=color===W?B:W;
+  const moves=[];
+  const add=(tr,tc,extra={})=>moves.push({fr:r,fc:c,tr,tc,...extra});
+
+  if(pt==='P'){
+    const dir=color===W?-1:1;
+    const startRow=color===W?6:1;
+    const promoRow=color===W?0:7;
+    // Forward
+    if(board[r+dir]?.[c]===EMPTY){
+      if(r+dir===promoRow) ['Q','R','B','N'].forEach(pp=>add(r+dir,c,{promo:pp}));
+      else {
+        add(r+dir,c);
+        if(r===startRow&&board[r+2*dir]?.[c]===EMPTY) add(r+2*dir,c,{twoStep:true});
+      }
+    }
+    // Captures
+    for(const dc of[-1,1]){
+      const tc=c+dc,tr=r+dir;
+      if(tc<0||tc>7) continue;
+      // Normal capture
+      if(board[tr]?.[tc]&&board[tr][tc][0]===opp){
+        if(tr===promoRow) ['Q','R','B','N'].forEach(pp=>add(tr,tc,{promo:pp}));
+        else add(tr,tc,{capture:true});
+      }
+      // En passant
+      if(gs.ep&&gs.ep.r===tr&&gs.ep.c===tc) add(tr,tc,{ep:true});
+    }
+  } else if(pt==='N'){
+    [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{
+      const tr=r+dr,tc=c+dc;
+      if(tr<0||tr>7||tc<0||tc>7) return;
+      if(!board[tr][tc]||board[tr][tc][0]===opp) add(tr,tc);
+    });
+  } else if(pt==='K'){
+    for(let dr=-1;dr<=1;dr++) for(let dc=-1;dc<=1;dc++){
+      if(!dr&&!dc) continue;
+      const tr=r+dr,tc=c+dc;
+      if(tr<0||tr>7||tc<0||tc>7) continue;
+      if(!board[tr][tc]||board[tr][tc][0]===opp) add(tr,tc);
+    }
+    // Castling
+    const cr=gs.cr;
+    const homeRow=color===W?7:0;
+    if(r===homeRow&&c===4&&!isInCheck(board,color)){
+      // Kingside
+      if((color===W?cr.wk:cr.bk)&&!board[homeRow][5]&&!board[homeRow][6]&&
+         !isAttacked(board,homeRow,5,opp)&&!isAttacked(board,homeRow,6,opp)&&board[homeRow][7]===color+'R')
+        add(homeRow,6,{castle:'K'});
+      // Queenside
+      if((color===W?cr.wq:cr.bq)&&!board[homeRow][3]&&!board[homeRow][2]&&!board[homeRow][1]&&
+         !isAttacked(board,homeRow,3,opp)&&!isAttacked(board,homeRow,2,opp)&&board[homeRow][0]===color+'R')
+        add(homeRow,2,{castle:'Q'});
+    }
+  } else {
+    const dirs=pt==='B'?[[-1,-1],[-1,1],[1,-1],[1,1]]:
+               pt==='R'?[[-1,0],[1,0],[0,-1],[0,1]]:
+               [[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]];
+    for(const [dr,dc] of dirs){
+      let tr=r+dr,tc=c+dc;
+      while(tr>=0&&tr<8&&tc>=0&&tc<8){
+        if(board[tr][tc]){
+          if(board[tr][tc][0]===opp) add(tr,tc);
+          break;
+        }
+        add(tr,tc);
+        tr+=dr;tc+=dc;
+      }
+    }
+  }
+  return moves;
+}
+
+function applyMoveSimple(board,m){
+  const b=copyBoard(board);
+  const p=b[m.fr][m.fc];
+  b[m.tr][m.tc]=m.promo?p[0]+m.promo:p;
+  b[m.fr][m.fc]=null;
+  if(m.ep) b[m.fr][m.tc]=null; // remove captured pawn
+  if(m.castle){
+    const row=m.fr;
+    if(m.castle==='K'){ b[row][5]=b[row][7]; b[row][7]=null; }
+    else { b[row][3]=b[row][0]; b[row][0]=null; }
+  }
+  return b;
+}
+
+function getLegalMoves(board,r,c,gs){
+  return getPseudoLegalMoves(board,r,c,gs).filter(m=>{
+    const nb=applyMoveSimple(board,m);
+    return !isInCheck(nb,board[r][c][0]);
+  });
+}
+
+function getAllLegalMoves(board,color,gs){
+  const moves=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    if(board[r][c]&&board[r][c][0]===color)
+      moves.push(...getLegalMoves(board,r,c,gs));
+  return moves;
+}
+
+function getAllMovesSimple(board,color){
+  const moves=[];
+  const gs={ep:null,cr:{wk:false,wq:false,bk:false,bq:false}};
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    if(board[r][c]&&board[r][c][0]===color)
+      moves.push(...getPseudoLegalMoves(board,r,c,gs));
+  return moves;
+}
+
+function isCheckmate(board,color,gs){ return isInCheck(board,color)&&getAllLegalMoves(board,color,gs).length===0; }
+function isStalemate(board,color,gs){ return !isInCheck(board,color)&&getAllLegalMoves(board,color,gs).length===0; }
+
+function isInsufficientMaterial(board){
+  const pieces=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) if(board[r][c]) pieces.push(board[r][c]);
+  if(pieces.length===2) return true; // KvK
+  if(pieces.length===3&&pieces.some(p=>p[1]==='N'||p[1]==='B')) return true; // KvK+minor
+  return false;
+}
+
+/* ── SAN NOTATION ──────────────────────────────────────────── */
+function toAlg(r,c){ return String.fromCharCode(97+c)+(8-r); }
+function toSAN(board,m,gs){
+  const p=board[m.fr][m.fc];
+  if(!p) return '?';
+  const pt=p[1];
+  if(m.castle) return m.castle==='K'?'O-O':'O-O-O';
+  let s='';
+  if(pt!=='P') s+=pt;
+  // Disambiguation
+  if(pt!=='P'&&pt!=='K'){
+    const others=[];
+    for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+      if(r===m.fr&&c===m.fc) continue;
+      if(board[r][c]===p){
+        const ms=getLegalMoves(board,r,c,gs);
+        if(ms.some(mm=>mm.tr===m.tr&&mm.tc===m.tc)) others.push([r,c]);
+      }
+    }
+    if(others.length>0){
+      const sameCol=others.some(([,c])=>c===m.fc);
+      const sameRow=others.some(([r])=>r===m.fr);
+      if(!sameCol) s+=String.fromCharCode(97+m.fc);
+      else if(!sameRow) s+=(8-m.fr);
+      else s+=String.fromCharCode(97+m.fc)+(8-m.fr);
+    }
+  }
+  const capture=board[m.tr][m.tc]||m.ep;
+  if(capture){ if(pt==='P') s+=String.fromCharCode(97+m.fc); s+='x'; }
+  s+=toAlg(m.tr,m.tc);
+  if(m.promo) s+='='+m.promo;
+  const nb=applyMoveSimple(board,m);
+  const opp=p[0]===W?B:W;
+  const fakeGs={ep:null,cr:{wk:false,wq:false,bk:false,bq:false}};
+  if(isCheckmate(nb,opp,fakeGs)) s+='#';
+  else if(isInCheck(nb,opp)) s+='+';
+  return s;
+}
+
+/* ── EVALUATION ────────────────────────────────────────────── */
+function evaluate(board){
+  let score=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c];
+    if(!p) continue;
+    const sign=p[0]===W?1:-1;
+    score+=sign*VAL[p[1]];
+    score+=sign*getPST(p[1],p[0],r,c);
+  }
+  return score;
+}
+
+function orderMoves(board,moves){
+  return moves.slice().sort((a,b)=>{
+    const va=board[a.tr][a.tc]?VAL[board[a.tr][a.tc][1]]:0;
+    const vb=board[b.tr][b.tc]?VAL[board[b.tr][b.tc][1]]:0;
+    return vb-va;
+  });
+}
+
+function minimax(board,depth,alpha,beta,maximizing,gs,quiesce=false){
+  const color=maximizing?W:B;
+  const gs2={ep:gs.ep,cr:{...gs.cr}};
+  const moves=getAllLegalMoves(board,color,gs2);
+  if(moves.length===0){
+    if(isInCheck(board,color,gs2)) return maximizing?-50000:50000;
+    return 0;
+  }
+  if(depth===0) return evaluate(board);
+  const ordered=orderMoves(board,moves);
+  if(maximizing){
+    let best=-Infinity;
+    for(const m of ordered){
+      const nb=applyMoveSimple(board,m);
+      const val=minimax(nb,depth-1,alpha,beta,false,gs2);
+      best=Math.max(best,val);
+      alpha=Math.max(alpha,best);
+      if(beta<=alpha) break;
+    }
+    return best;
+  } else {
+    let best=Infinity;
+    for(const m of ordered){
+      const nb=applyMoveSimple(board,m);
+      const val=minimax(nb,depth-1,alpha,beta,true,gs2);
+      best=Math.min(best,val);
+      beta=Math.min(beta,best);
+      if(beta<=alpha) break;
+    }
+    return best;
+  }
+}
+
+function getAIMove(board,color,difficulty,gs){
+  const moves=getAllLegalMoves(board,color,gs);
+  if(moves.length===0) return null;
+  if(difficulty==='easy'){
+    if(Math.random()<0.85) return moves[Math.floor(Math.random()*moves.length)];
+    difficulty='medium';
+  }
+  const depth=difficulty==='medium'?2:difficulty==='hard'?3:4;
+  const maximizing=color===W;
+  let bestMove=moves[0],bestVal=maximizing?-Infinity:Infinity;
+  const ordered=orderMoves(board,moves);
+  for(const m of ordered){
+    const nb=applyMoveSimple(board,m);
+    const val=minimax(nb,depth-1,-Infinity,Infinity,!maximizing,gs);
+    if(maximizing?val>bestVal:val<bestVal){ bestVal=val; bestMove=m; }
+  }
+  if(difficulty==='medium'&&Math.random()<0.15) return moves[Math.floor(Math.random()*moves.length)];
+  return bestMove;
+}
+
+/* ── STRATEGY SUGGESTION ───────────────────────────────────── */
+function getStrategySuggestion(board,color,strategyIdx,gs){
+  const strat=STRATEGIES[strategyIdx];
+  const moves=getAllLegalMoves(board,color,gs);
+  if(moves.length===0) return null;
+  let best=null,bestScore=-Infinity;
+  for(const m of moves){
+    const base=board[m.tr][m.tc]?VAL[board[m.tr][m.tc][1]]*0.5:0;
+    const stratScore=strat.scoreMove(board,m,color);
+    const total=base+stratScore;
+    if(total>bestScore){ bestScore=total; best=m; }
+  }
+  if(!best) best=moves[0];
+  const fromAlg=toAlg(best.fr,best.fc);
+  const toAlgStr=toAlg(best.tr,best.tc);
+  return {
+    move:best,
+    fromAlg,toAlg:toAlgStr,
+    narrative:strat.narrative(fromAlg,toAlgStr)
+  };
+}
+
+/* ══ GAME STATE ════════════════════════════════════════════════ */
+let gs={
+  board:null, turn:W, selected:null, validMoves:[],
+  ep:null, cr:{wk:true,wq:true,bk:true,bq:true},
+  history:[], capturedW:[], capturedB:[],
+  mode:'2p', aiColor:B, difficulty:'medium',
+  strategyEnabled:false, strategyIdx:0, suggestion:null,
+  clockEnabled:false, timeW:300, timeB:300, increment:0,
+  clockInterval:null, lastTickTime:null,
+  boardFlipped:false, gameOver:false, pendingPromotion:null,
+  nameW:'Gold Player', nameB:'Silver Player',
+  lastMove:null, halfmoveClock:0, positionHistory:[]
+};
+
+// Setup config
+let cfg={mode:'2p',diff:'medium',color:'W',strategy:'yes',stratIdx:0,clock:'none',tc:'300,0'};
+
+/* ══ SETUP UI ═════════════════════════════════════════════════ */
+document.querySelectorAll('.btn-opt').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const g=btn.dataset.group;
+    document.querySelectorAll(`.btn-opt[data-group="${g}"]`).forEach(b=>{
+      b.classList.remove('active','active-silver');
+    });
+    if(g==='color'&&btn.dataset.val==='B') btn.classList.add('active-silver');
+    else btn.classList.add('active');
+    handleSetupChange(g,btn.dataset.val);
+  });
+});
+
+function handleSetupChange(group,val){
+  cfg[group==='diff'?'diff':group==='color'?'color':group==='strategy'?'strategy':group==='clock'?'clock':group==='tc'?'tc':'mode']=val;
+  // Show/hide conditional sections
+  const isAI=cfg.mode==='ai';
+  document.getElementById('diff-group').classList.toggle('hidden',!isAI);
+  document.getElementById('color-group').classList.toggle('hidden',!isAI);
+  document.getElementById('strategy-opt').classList.toggle('hidden',!isAI);
+  document.getElementById('clock-opts').classList.toggle('hidden',cfg.clock!=='timed');
+}
+
+document.getElementById('btn-start-game').addEventListener('click',startGame);
+
+function startGame(){
+  const nameW=document.getElementById('name-gold').value.trim()||'Gold Player';
+  const nameB=document.getElementById('name-silver').value.trim()||'Silver Player';
+
+  let timeVal=300,inc=0;
+  if(cfg.clock==='timed'){
+    const [t,i]=cfg.tc.split(',').map(Number);
+    timeVal=t; inc=i;
+  }
+
+  // If strategy is on and AI mode, show strategy picker first
+  if(cfg.mode==='ai'&&cfg.strategy==='yes'){
+    openStrategyModal(true,(idx)=>{
+      cfg.stratIdx=idx;
+      initGame(nameW,nameB,timeVal,inc);
+    });
+  } else {
+    initGame(nameW,nameB,timeVal,inc);
+  }
+}
+
+function initGame(nameW,nameB,timeVal,inc){
+  gs={
+    board:initBoard(), turn:W, selected:null, validMoves:[],
+    ep:null, cr:{wk:true,wq:true,bk:true,bq:true},
+    history:[], capturedW:[], capturedB:[],
+    mode:cfg.mode, aiColor:cfg.color==='W'?B:W,
+    difficulty:cfg.diff,
+    strategyEnabled:cfg.mode==='ai'&&cfg.strategy==='yes',
+    strategyIdx:cfg.stratIdx, suggestion:null,
+    clockEnabled:cfg.clock==='timed',
+    timeW:timeVal, timeB:timeVal, increment:inc,
+    clockInterval:null, lastTickTime:null,
+    boardFlipped:cfg.mode==='ai'&&cfg.color==='B',
+    gameOver:false, pendingPromotion:null,
+    nameW, nameB, lastMove:null,
+    halfmoveClock:0, positionHistory:[]
+  };
+
+  showScreen('game');
+  buildCoords();
+  renderBoard();
+  updatePlayerBars();
+  updateClock();
+  updateMoveHistory();
+  updateCaptured();
+  updateStatus('');
+
+  // Strategy panel
+  const sp=document.getElementById('strat-panel');
+  const ms=document.getElementById('mobile-strat');
+  if(gs.strategyEnabled){
+    sp.style.display='';
+    ms.style.display='';
+    document.getElementById('strat-name').textContent=STRATEGIES[gs.strategyIdx].name;
+    document.getElementById('strat-desc').textContent=STRATEGIES[gs.strategyIdx].desc;
+    document.getElementById('m-strat-name').textContent=STRATEGIES[gs.strategyIdx].name;
+  } else {
+    sp.style.display='none';
+    ms.style.display='none';
+  }
+
+  // Clock panel
+  document.getElementById('clock-panel').style.display=gs.clockEnabled?'':'none';
+  if(gs.clockEnabled) startClock();
+
+  // AI moves first if needed
+  if(gs.mode==='ai'&&gs.turn===gs.aiColor) setTimeout(doAIMove,400);
+  else if(gs.strategyEnabled) computeSuggestion();
+}
+
+/* ══ SCREEN SWITCHING ═════════════════════════════════════════ */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+id).classList.add('active');
+}
+
+/* ══ BOARD RENDERING ══════════════════════════════════════════ */
+function buildCoords(){
+  const ranks=document.getElementById('coords-ranks');
+  const files=document.getElementById('coords-files');
+  ranks.innerHTML=''; files.innerHTML='';
+  for(let i=0;i<8;i++){
+    const r=document.createElement('div');
+    r.className='coord coord-rank';
+    r.textContent=gs.boardFlipped?i+1:8-i;
+    ranks.appendChild(r);
+  }
+  for(let i=0;i<8;i++){
+    const f=document.createElement('div');
+    f.className='coord coord-file';
+    f.textContent=String.fromCharCode(97+(gs.boardFlipped?7-i:i));
+    files.appendChild(f);
+  }
+}
+
+function renderBoard(){
+  const boardEl=document.getElementById('board');
+  boardEl.innerHTML='';
+  const sugg=gs.suggestion;
+
+  for(let vi=0;vi<8;vi++){
+    for(let vj=0;vj<8;vj++){
+      const r=gs.boardFlipped?7-vi:vi;
+      const c=gs.boardFlipped?7-vj:vj;
+
+      const sq=document.createElement('div');
+      sq.className='sq '+((r+c)%2===0?'light':'dark');
+      sq.dataset.r=r; sq.dataset.c=c;
+
+      // Highlights
+      if(gs.selected&&gs.selected.r===r&&gs.selected.c===c) sq.classList.add('selected');
+      if(gs.lastMove){
+        if(gs.lastMove.fr===r&&gs.lastMove.fc===c) sq.classList.add('last-from');
+        if(gs.lastMove.tr===r&&gs.lastMove.tc===c) sq.classList.add('last-to');
+      }
+      if(sugg){
+        if(sugg.move.fr===r&&sugg.move.fc===c) sq.classList.add('strat-from');
+        if(sugg.move.tr===r&&sugg.move.tc===c) sq.classList.add('strat-to');
+      }
+      // Check highlight
+      if(gs.board[r][c]&&gs.board[r][c][1]==='K'&&isInCheck(gs.board,gs.board[r][c][0])){
+        sq.classList.add('in-check');
+      }
+
+      // Valid moves
+      if(gs.validMoves.some(m=>m.tr===r&&m.tc===c)){
+        if(gs.board[r][c]) sq.classList.add('valid-capture');
+        else sq.classList.add('valid-move');
+      }
+
+      // Piece
+      const p=gs.board[r][c];
+      if(p){
+        const pd=document.createElement('div');
+        pd.className='piece '+(p[0]===W?'gold-piece':'silver-piece');
+        pd.textContent=SYM[p];
+        sq.appendChild(pd);
+      }
+
+      sq.addEventListener('click',()=>handleSquareClick(r,c));
+      sq.addEventListener('touchstart',e=>{ e.preventDefault(); handleSquareClick(r,c); },{passive:false});
+      boardEl.appendChild(sq);
+    }
+  }
+}
+
+/* ══ GAME LOGIC ═══════════════════════════════════════════════ */
+function handleSquareClick(r,c){
+  if(gs.gameOver||gs.pendingPromotion) return;
+  if(gs.mode==='ai'&&gs.turn===gs.aiColor) return;
+
+  const p=gs.board[r][c];
+
+  // Deselect
+  if(gs.selected&&gs.selected.r===r&&gs.selected.c===c){
+    gs.selected=null; gs.validMoves=[]; renderBoard(); return;
+  }
+
+  // Make move if valid
+  if(gs.selected){
+    const move=gs.validMoves.find(m=>m.tr===r&&m.tc===c);
+    if(move){
+      // Handle promotions
+      const promos=gs.validMoves.filter(m=>m.tr===r&&m.tc===c&&m.promo);
+      if(promos.length>0){
+        gs.pendingPromotion={r,c,moves:promos};
+        openPromoModal(gs.board[gs.selected.r][gs.selected.c][0]);
+        return;
+      }
+      executeMove(move);
+      return;
+    }
+  }
+
+  // Select piece
+  if(p&&p[0]===gs.turn){
+    gs.selected={r,c};
+    gs.validMoves=getLegalMoves(gs.board,r,c,gs);
+    renderBoard();
+  }
+}
+
+function executeMove(m){
+  const san=toSAN(gs.board,m,gs);
+  const oldBoard=gs.board;
+
+  gs.board=applyMoveSimple(gs.board,m);
+  gs.lastMove=m;
+
+  // Update castling rights
+  const p=oldBoard[m.fr][m.fc];
+  if(p[1]==='K'){ if(p[0]===W){gs.cr.wk=false;gs.cr.wq=false;}else{gs.cr.bk=false;gs.cr.bq=false;} }
+  if(p[1]==='R'){
+    if(m.fr===7&&m.fc===7) gs.cr.wk=false;
+    if(m.fr===7&&m.fc===0) gs.cr.wq=false;
+    if(m.fr===0&&m.fc===7) gs.cr.bk=false;
+    if(m.fr===0&&m.fc===0) gs.cr.bq=false;
+  }
+
+  // En passant target
+  gs.ep=m.twoStep?{r:(m.fr+m.tr)/2,c:m.fc}:null;
+
+  // Captured pieces
+  if(oldBoard[m.tr][m.tc]) (p[0]===W?gs.capturedW:gs.capturedB).push(oldBoard[m.tr][m.tc]);
+  if(m.ep) (p[0]===W?gs.capturedW:gs.capturedB).push(oldBoard[m.fr][m.tc]);
+
+  // Halfmove clock (50-move rule)
+  if(p[1]==='P'||oldBoard[m.tr][m.tc]) gs.halfmoveClock=0;
+  else gs.halfmoveClock++;
+
+  // History
+  gs.history.push({move:m,san,turn:gs.turn});
+  gs.positionHistory.push(JSON.stringify(gs.board));
+
+  // Clock increment
+  if(gs.clockEnabled){
+    if(gs.turn===W) gs.timeW+=gs.increment;
+    else gs.timeB+=gs.increment;
+  }
+
+  gs.selected=null; gs.validMoves=[];
+  gs.turn=gs.turn===W?B:W;
+  gs.suggestion=null;
+
+  // Check end conditions
+  const opp=gs.turn;
+  if(isCheckmate(gs.board,opp,gs)){ endGame(gs.turn===W?B:W,'checkmate'); return; }
+  if(isStalemate(gs.board,opp,gs)){ endGame(null,'stalemate'); return; }
+  if(isInsufficientMaterial(gs.board)){ endGame(null,'insufficient'); return; }
+  if(gs.halfmoveClock>=100){ endGame(null,'50move'); return; }
+
+  // 3-fold repetition
+  const pos=gs.positionHistory[gs.positionHistory.length-1];
+  if(gs.positionHistory.filter(p=>p===pos).length>=3){ endGame(null,'repetition'); return; }
+
+  renderBoard();
+  updatePlayerBars();
+  updateMoveHistory();
+  updateCaptured();
+
+  // Strategy suggestion
+  if(gs.strategyEnabled&&gs.turn!==gs.aiColor) computeSuggestion();
+
+  // AI move
+  if(gs.mode==='ai'&&gs.turn===gs.aiColor) setTimeout(doAIMove,300+Math.random()*300);
+}
+
+function doAIMove(){
+  if(gs.gameOver) return;
+  const m=getAIMove(gs.board,gs.aiColor,gs.difficulty,gs);
+  if(m) executeMove(m);
+}
+
+function computeSuggestion(){
+  if(!gs.strategyEnabled||gs.gameOver) return;
+  gs.suggestion=getStrategySuggestion(gs.board,gs.turn,gs.strategyIdx,gs);
+  updateStrategyPanel();
+  renderBoard();
+}
+
+function updateStrategyPanel(){
+  const s=gs.suggestion;
+  const panel=document.getElementById('strat-sugg');
+  const mpanel=document.getElementById('m-strat-sugg');
+  if(s){
+    document.getElementById('sugg-move').textContent=`Suggested: ${s.fromAlg} → ${s.toAlg}`;
+    document.getElementById('sugg-why').textContent=s.narrative;
+    document.getElementById('m-sugg-move').textContent=`Suggested: ${s.fromAlg} → ${s.toAlg}`;
+    document.getElementById('m-sugg-why').textContent=s.narrative;
+    panel.style.display=''; mpanel.style.display='';
+  } else {
+    panel.style.display='none'; mpanel.style.display='none';
+  }
+}
+
+/* ══ CLOCK ════════════════════════════════════════════════════ */
+function startClock(){
+  if(gs.clockInterval) clearInterval(gs.clockInterval);
+  gs.lastTickTime=Date.now();
+  gs.clockInterval=setInterval(tickClock,100);
+}
+
+function tickClock(){
+  if(gs.gameOver) return;
+  const now=Date.now();
+  const delta=(now-gs.lastTickTime)/1000;
+  gs.lastTickTime=now;
+  if(gs.turn===W) gs.timeW=Math.max(0,gs.timeW-delta);
+  else gs.timeB=Math.max(0,gs.timeB-delta);
+  updateClock();
+  if(gs.timeW<=0) endGame(B,'timeout');
+  else if(gs.timeB<=0) endGame(W,'timeout');
+}
+
+function stopClock(){ if(gs.clockInterval){ clearInterval(gs.clockInterval); gs.clockInterval=null; } }
+
+function fmtTime(s){
+  s=Math.ceil(s);
+  const m=Math.floor(s/60);
+  const sec=s%60;
+  return m+':'+(sec<10?'0':'')+sec;
+}
+
+function updateClock(){
+  const gEl=document.getElementById('clock-gold-time');
+  const sEl=document.getElementById('clock-silver-time');
+  gEl.textContent=gs.clockEnabled?fmtTime(gs.timeW):'—';
+  sEl.textContent=gs.clockEnabled?fmtTime(gs.timeB):'—';
+  gEl.className='clock-time'+(gs.clockEnabled&&gs.timeW<30?' warning':'');
+  sEl.className='clock-time'+(gs.clockEnabled&&gs.timeB<30?' warning':'');
+
+  // Active clock highlight
+  document.getElementById('clock-gold').className='clock-player gold-player'+(gs.turn===W&&!gs.gameOver?' active-clock':'');
+  document.getElementById('clock-silver').className='clock-player silver-player'+(gs.turn===B&&!gs.gameOver?' active-clock silver-turn':'');
+  document.getElementById('clock-gold-name').textContent=gs.nameW;
+  document.getElementById('clock-silver-name').textContent=gs.nameB;
+}
+
+/* ══ PLAYER BARS ══════════════════════════════════════════════ */
+function updatePlayerBars(){
+  // Determine which color is on top vs bottom
+  const topColor=gs.boardFlipped?W:B;
+  const botColor=gs.boardFlipped?B:W;
+
+  const topName=topColor===W?gs.nameW:gs.nameB;
+  const botName=botColor===W?gs.nameW:gs.nameB;
+
+  document.getElementById('pbar-top-name').textContent=topName;
+  document.getElementById('pbar-top-name').className='pbar-name '+(topColor===W?'gold':'silver');
+  document.getElementById('pbar-bottom-name').textContent=botName;
+  document.getElementById('pbar-bottom-name').className='pbar-name '+(botColor===W?'gold':'silver');
+
+  // Turn dots
+  const dotTop=document.getElementById('dot-top');
+  const dotBot=document.getElementById('dot-bottom');
+  dotTop.className='turn-dot '+(topColor===B?'silver-dot':'')+' '+(gs.turn===topColor&&!gs.gameOver?'lit':'');
+  dotBot.className='turn-dot '+(botColor===B?'silver-dot':'')+' '+(gs.turn===botColor&&!gs.gameOver?'lit':'');
+
+  // Active bar
+  const barTop=document.getElementById('bar-top');
+  const barBot=document.getElementById('bar-bottom');
+  barTop.className='player-bar'+(gs.turn===topColor&&!gs.gameOver?' active-bar'+(topColor===B?' silver-bar':''):'');
+  barBot.className='player-bar'+(gs.turn===botColor&&!gs.gameOver?' active-bar'+(botColor===B?' silver-bar':''):'');
+}
+
+function updateCaptured(){
+  // Gold captured Black's pieces; Silver captured White's pieces
+  const topColor=gs.boardFlipped?W:B;
+
+  const goldCaps=gs.capturedW.map(p=>SYM[p]).join('');
+  const silvCaps=gs.capturedB.map(p=>SYM[p]).join('');
+
+  // Material advantage
+  const goldMat=gs.capturedW.reduce((s,p)=>s+VAL[p[1]],0);
+  const silvMat=gs.capturedB.reduce((s,p)=>s+VAL[p[1]],0);
+  const diff=goldMat-silvMat;
+
+  if(topColor===B){
+    document.getElementById('pbar-top-caps').textContent=silvCaps;
+    document.getElementById('pbar-bottom-caps').textContent=goldCaps;
+    document.getElementById('pbar-top-adv').textContent=silvMat>goldMat?'+'+(silvMat-goldMat):'';
+    document.getElementById('pbar-bottom-adv').textContent=goldMat>silvMat?'+'+diff:'';
+  } else {
+    document.getElementById('pbar-top-caps').textContent=goldCaps;
+    document.getElementById('pbar-bottom-caps').textContent=silvCaps;
+    document.getElementById('pbar-top-adv').textContent=goldMat>silvMat?'+'+diff:'';
+    document.getElementById('pbar-bottom-adv').textContent=silvMat>goldMat?'+'+(silvMat-goldMat):'';
+  }
+
+  // Side panel captured
+  document.getElementById('cap-gold-side').textContent=goldCaps;
+  document.getElementById('cap-silver-side').textContent=silvCaps;
+  const ms=document.getElementById('mat-score');
+  if(diff>0) ms.innerHTML=`<span class="mat-adv">Gold +${diff}</span>`;
+  else if(diff<0) ms.innerHTML=`<span class="mat-disadv">Silver +${-diff}</span>`;
+  else ms.textContent='Even';
+}
+
+/* ══ MOVE HISTORY ═════════════════════════════════════════════ */
+function updateMoveHistory(){
+  const el=document.getElementById('move-history');
+  el.innerHTML='';
+  const moves=gs.history;
+  for(let i=0;i<moves.length;i+=2){
+    const pair=document.createElement('div');
+    pair.className='move-pair';
+    const num=document.createElement('div');
+    num.className='move-num'; num.textContent=(i/2+1)+'.';
+    pair.appendChild(num);
+
+    for(let j=0;j<2;j++){
+      const mv=document.createElement('div');
+      mv.className='move-san'+(i+j===moves.length-1?' current':'');
+      mv.textContent=moves[i+j]?.san||'';
+      pair.appendChild(mv);
+    }
+    el.appendChild(pair);
+  }
+  el.scrollTop=el.scrollHeight;
+}
+
+function updateStatus(msg){ document.getElementById('status-bar').textContent=msg; }
+
+/* ══ END GAME ═════════════════════════════════════════════════ */
+function endGame(winner,reason){
+  gs.gameOver=true;
+  stopClock();
+
+  let icon='',title='',sub='';
+  if(reason==='checkmate'){
+    icon=winner===W?'♔':'♚';
+    const wName=winner===W?gs.nameW:gs.nameB;
+    title=wName+' Wins!';
+    sub='Victory by checkmate.';
+  } else if(reason==='timeout'){
+    icon=winner===W?'♔':'♚';
+    title=(winner===W?gs.nameW:gs.nameB)+' Wins!';
+    sub='Opponent ran out of time.';
+  } else if(reason==='resign'){
+    icon=winner===W?'♔':'♚';
+    title=(winner===W?gs.nameW:gs.nameB)+' Wins!';
+    sub='Opponent resigned.';
+  } else {
+    icon='⚖️';
+    title='Draw!';
+    sub={stalemate:'Stalemate — no legal moves.',insufficient:'Insufficient material.',
+         '50move':'50-move rule.',repetition:'Threefold repetition.'}[reason]||'Draw agreed.';
+  }
+
+  document.getElementById('result-icon').textContent=icon;
+  document.getElementById('result-title').textContent=title;
+  document.getElementById('result-sub').textContent=sub;
+  openModal('modal-gameover');
+
+  renderBoard();
+  updatePlayerBars();
+}
+
+/* ══ MODALS ═══════════════════════════════════════════════════ */
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+// Promotion
+function openPromoModal(color){
+  const container=document.getElementById('promo-choices');
+  container.innerHTML='';
+  ['Q','R','B','N'].forEach(pt=>{
+    const btn=document.createElement('button');
+    btn.className='promo-btn';
+    const sym=document.createElement('div');
+    sym.className='promo-piece-sym '+(color===W?'gold-piece':'silver-piece');
+    sym.textContent=SYM[color+pt];
+    const lbl=document.createElement('div');
+    lbl.className='promo-label';
+    lbl.textContent={Q:'Queen',R:'Rook',B:'Bishop',N:'Knight'}[pt];
+    btn.appendChild(sym); btn.appendChild(lbl);
+    btn.addEventListener('click',()=>{
+      const pp=gs.pendingPromotion;
+      gs.pendingPromotion=null;
+      closeModal('modal-promo');
+      const move=pp.moves.find(m=>m.promo===pt);
+      if(move) executeMove(move);
+    });
+    container.appendChild(btn);
+  });
+  openModal('modal-promo');
+}
+
+// Strategy
+let stratPendingCallback=null;
+let stratSelectedIdx=0;
+
+function buildStrategyGrid(){
+  const grid=document.getElementById('strategy-grid');
+  grid.innerHTML='';
+  STRATEGIES.forEach((s,i)=>{
+    const card=document.createElement('div');
+    card.className='strategy-card'+(i===stratSelectedIdx?' selected-card':'');
+    card.innerHTML=`<div class="sc-num">#${i+1}</div><div class="sc-name">${s.name}</div><div class="sc-desc">${s.desc.substring(0,80)}...</div>`;
+    card.addEventListener('click',()=>{
+      stratSelectedIdx=i;
+      document.querySelectorAll('.strategy-card').forEach((c,j)=>c.classList.toggle('selected-card',j===i));
+    });
+    grid.appendChild(card);
+  });
+}
+
+function openStrategyModal(isSetup,callback){
+  stratSelectedIdx=gs.strategyIdx||0;
+  stratPendingCallback=callback||null;
+  buildStrategyGrid();
+  document.getElementById('btn-strat-cancel').style.display=isSetup?'none':'';
+  openModal('modal-strategy');
+}
+
+document.getElementById('btn-strat-confirm').addEventListener('click',()=>{
+  closeModal('modal-strategy');
+  if(stratPendingCallback){ stratPendingCallback(stratSelectedIdx); stratPendingCallback=null; }
+  else {
+    gs.strategyIdx=stratSelectedIdx;
+    document.getElementById('strat-name').textContent=STRATEGIES[stratSelectedIdx].name;
+    document.getElementById('strat-desc').textContent=STRATEGIES[stratSelectedIdx].desc;
+    document.getElementById('m-strat-name').textContent=STRATEGIES[stratSelectedIdx].name;
+    gs.suggestion=null;
+    if(gs.turn!==gs.aiColor) computeSuggestion();
+  }
+});
+document.getElementById('btn-strat-cancel').addEventListener('click',()=>closeModal('modal-strategy'));
+document.getElementById('btn-change-strat').addEventListener('click',()=>openStrategyModal(false));
+document.getElementById('m-btn-change-strat').addEventListener('click',()=>openStrategyModal(false));
+
+// Game over
+document.getElementById('btn-rematch').addEventListener('click',()=>{
+  closeModal('modal-gameover');
+  initGame(gs.nameW,gs.nameB,gs.clockEnabled?gs.timeW+gs.timeB>0?300:300:300,gs.increment);
+});
+document.getElementById('btn-menu').addEventListener('click',()=>{
+  closeModal('modal-gameover');
+  stopClock();
+  showScreen('setup');
+});
+
+// Draw offer
+document.getElementById('btn-draw').addEventListener('click',()=>{
+  if(gs.gameOver) return;
+  const offerer=gs.turn===W?gs.nameW:gs.nameB;
+  const responder=gs.turn===W?gs.nameB:gs.nameW;
+  document.getElementById('draw-offer-msg').textContent=`${offerer} offers a draw. Does ${responder} accept?`;
+  openModal('modal-draw');
+});
+document.getElementById('btn-draw-accept').addEventListener('click',()=>{ closeModal('modal-draw'); endGame(null,'agreed'); });
+document.getElementById('btn-draw-decline').addEventListener('click',()=>closeModal('modal-draw'));
+
+// Resign
+document.getElementById('btn-resign').addEventListener('click',()=>{
+  if(gs.gameOver) return;
+  const winner=gs.turn===W?B:W;
+  endGame(winner,'resign');
+});
+
+// Flip
+document.getElementById('btn-flip').addEventListener('click',()=>{
+  gs.boardFlipped=!gs.boardFlipped;
+  buildCoords();
+  renderBoard();
+  updatePlayerBars();
+});
+
+// New Game
+document.getElementById('btn-new').addEventListener('click',()=>{
+  stopClock();
+  showScreen('setup');
+});
+
+/* ══ SETUP INITIAL STATE ══════════════════════════════════════ */
+// Apply initial hidden states
+handleSetupChange('mode','2p');
+</script>
+</body>
+</html>
