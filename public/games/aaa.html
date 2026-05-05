@@ -1079,7 +1079,9 @@
     }
 
     /* Floating gear trigger */
-    .gearButton {
+    .gearButton,
+    .setupFloatingButton,
+    .powerFloatingButton {
       position: absolute;
       z-index: 80;
       right: calc(env(safe-area-inset-right) + 16px);
@@ -1098,11 +1100,33 @@
       animation: gearPulse 1.7s ease-in-out infinite;
     }
 
-    .gearButton svg {
+    .setupFloatingButton {
+      bottom: calc(env(safe-area-inset-bottom) + 88px);
+      animation: none;
+    }
+
+    .powerFloatingButton {
+      left: calc(env(safe-area-inset-left) + 16px);
+      right: auto;
+      animation: none;
+    }
+
+    .gearButton svg,
+    .setupFloatingButton svg,
+    .powerFloatingButton svg {
       width: 28px;
       height: 28px;
       fill: currentColor;
       transition: transform .25s ease;
+    }
+
+    .setupFloatingButton svg rect {
+      fill: #fff;
+    }
+
+    .powerFloatingButton svg path,
+    .powerFloatingButton svg rect {
+      fill: #fff;
     }
 
     .gearButton.open svg {
@@ -1172,9 +1196,20 @@
     }
 
     @media (orientation: landscape) {
-      .gearButton {
+      .gearButton,
+      .setupFloatingButton,
+      .powerFloatingButton {
         right: calc(env(safe-area-inset-right) + 18px);
         bottom: calc(env(safe-area-inset-bottom) + 18px);
+      }
+
+      .setupFloatingButton {
+        bottom: calc(env(safe-area-inset-bottom) + 90px);
+      }
+
+      .powerFloatingButton {
+        left: calc(env(safe-area-inset-left) + 18px);
+        right: auto;
       }
 
       .gameDock,
@@ -1202,6 +1237,238 @@
     .dockAction.active {
       background: #273b50;
       color: white;
+    }
+
+    button.dockAction {
+      border: 0;
+      appearance: none;
+    }
+
+    .gameSetupModal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: none;
+      background: rgba(15, 23, 42, .54);
+      color: #172033;
+    }
+
+    .gameSetupModal.open {
+      display: flex;
+    }
+
+    .gameSetupPanel {
+      width: 100%;
+      height: 100%;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .gameSetupHeader,
+    .gameSetupFooter {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 18px;
+      background: rgba(255,255,255,.96);
+      border-bottom: 1px solid rgba(148,163,184,.35);
+    }
+
+    .gameSetupFooter {
+      border-top: 1px solid rgba(148,163,184,.35);
+      border-bottom: 0;
+    }
+
+    .gameSetupTitle {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .gameSetupTitle strong {
+      font-size: 20px;
+      color: #0f172a;
+    }
+
+    .gameSetupTitle span,
+    .gameSetupHint {
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .gameSetupActions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .setupButton {
+      border: 1px solid rgba(15,23,42,.14);
+      background: #fff;
+      color: #172033;
+      border-radius: 999px;
+      padding: 9px 13px;
+      font-weight: 900;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      box-shadow: 0 8px 18px rgba(15,23,42,.08);
+    }
+
+    .setupButton.primary {
+      background: #172033;
+      color: #fff;
+      border-color: #172033;
+    }
+
+    .setupButton svg,
+    .setupDockIcon {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .gameSetupBody {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .setupTableWrap {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 12px 18px 20px;
+    }
+
+    .setupMatrix {
+      width: 100%;
+      min-width: 980px;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: #fff;
+      border: 1px solid rgba(148,163,184,.36);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 14px 32px rgba(15,23,42,.08);
+    }
+
+    .setupMatrix th,
+    .setupMatrix td {
+      border-bottom: 1px solid rgba(148,163,184,.28);
+      border-right: 1px solid rgba(148,163,184,.22);
+      padding: 8px;
+      text-align: center;
+      background: #fff;
+    }
+
+    .setupMatrix th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #eef4fb;
+      color: #26364d;
+      font-size: 12px;
+    }
+
+    .setupMatrix th:first-child,
+    .setupMatrix td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      text-align: left;
+      min-width: 230px;
+      background: #fff;
+    }
+
+    .setupMatrix th:first-child {
+      z-index: 4;
+      background: #e6eef8;
+    }
+
+    .setupRowName {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .setupRowName span {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .setupPieceHead {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .setupPieceHead svg {
+      position: static !important;
+      width: 26px;
+      height: 22px;
+      color: var(--piece-colour, #334155);
+      filter: drop-shadow(0 2px 1px rgba(15,23,42,.2));
+    }
+
+    .setupNumber {
+      width: 58px;
+      height: 34px;
+      border-radius: 8px;
+      border: 2px solid #cbd5e1;
+      text-align: center;
+      font-weight: 900;
+      font-size: 14px;
+      color: #0f172a;
+      background: #fff;
+    }
+
+    .setupNumber:disabled {
+      color: #94a3b8;
+      background: #f1f5f9;
+      border-style: dashed;
+    }
+
+    .setupJsonView {
+      flex: 1;
+      min-height: 0;
+      margin: 12px 18px 20px;
+      overflow: auto;
+      white-space: pre;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,.36);
+      background: #0f172a;
+      color: #dbeafe;
+      padding: 16px;
+      font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    @media (max-width: 760px) {
+      .gameSetupHeader,
+      .gameSetupFooter {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .gameSetupActions {
+        width: 100%;
+        justify-content: flex-start;
+      }
     }
 
   
@@ -1604,22 +1871,62 @@
       place-items: center;
     }
     .viewToggleBtn.flat { font-size: 24px !important; }
-    .gearButton {
+    .gearButton,
+    .setupFloatingButton,
+    .powerFloatingButton {
       width: 70px; height: 70px; right: calc(16px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom));
       background: rgba(15, 23, 42, .93); border: 1px solid rgba(255,255,255,.18); box-shadow: 0 12px 26px rgba(0,0,0,.35);
     }
 
+    .setupFloatingButton {
+      bottom: calc(102px + env(safe-area-inset-bottom));
+    }
+
+    .powerFloatingButton {
+      left: calc(16px + env(safe-area-inset-left));
+      right: auto;
+      bottom: calc(18px + env(safe-area-inset-bottom));
+    }
+
     .jumpBar {
       left: calc(16px + env(safe-area-inset-left));
-      bottom: calc(18px + env(safe-area-inset-bottom));
-      transform: none;
+      right: auto;
+      bottom: calc(74px + env(safe-area-inset-bottom));
+      transform: translateY(12px);
       width: auto;
       max-width: calc(100vw - 128px - env(safe-area-inset-left) - env(safe-area-inset-right));
+      max-height: calc(100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
       justify-content: flex-start;
-      overflow-x: auto;
-      padding: 0 6px 4px 0;
+      align-items: flex-start;
+      flex-direction: column !important;
+      gap: 8px !important;
+      overflow: visible;
+      padding: 0;
       scrollbar-width: none;
       z-index: 66;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease, transform .22s ease;
+    }
+
+    .jumpBar.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .jumpBar button {
+      transform: translateY(12px) scale(.96);
+      opacity: 0;
+      transition:
+        opacity .18s ease,
+        transform .24s cubic-bezier(.2,.72,.2,1);
+      transition-delay: calc(var(--i, 0) * 34ms);
+    }
+
+    .jumpBar.open button {
+      opacity: 1;
+      transform: translateY(0) scale(1);
     }
     .jumpBar::-webkit-scrollbar { display: none; }
     .jumpBar button {
@@ -1750,7 +2057,9 @@
 
     .zoomControls button,
     .zoomControls .viewToggleBtn,
-    .gearButton {
+    .gearButton,
+    .setupFloatingButton,
+    .powerFloatingButton {
       width: 48px !important;
       height: 48px !important;
       min-width: 48px !important;
@@ -1773,7 +2082,20 @@
       bottom: calc(18px + env(safe-area-inset-bottom)) !important;
     }
 
-    .gearButton svg {
+    .setupFloatingButton {
+      right: calc(16px + env(safe-area-inset-right)) !important;
+      bottom: calc(74px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .powerFloatingButton {
+      left: calc(16px + env(safe-area-inset-left)) !important;
+      right: auto !important;
+      bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+    }
+
+    .gearButton svg,
+    .setupFloatingButton svg,
+    .powerFloatingButton svg {
       width: 24px !important;
       height: 24px !important;
     }
@@ -1781,7 +2103,9 @@
     @media (max-width: 760px) {
       .zoomControls button,
       .zoomControls .viewToggleBtn,
-      .gearButton {
+      .gearButton,
+      .setupFloatingButton,
+      .powerFloatingButton {
         width: 42px !important;
         height: 42px !important;
         min-width: 42px !important;
@@ -2147,6 +2471,11 @@
       top: 11px !important;
     }
 
+    .navalMarker.singlePiece.coastalFleetMarker .navalStack.destroyer {
+      left: 84px !important;
+      top: 72px !important;
+    }
+
     .navalMarker.singlePiece .navalStack.carrier .unitIcon {
       width: 86px !important;
       height: 28px !important;
@@ -2238,6 +2567,16 @@
       pointer-events: none;
       transform: translate3d(-9999px, -9999px, 0);
       filter: drop-shadow(0 18px 18px rgba(0,0,0,.42));
+      transition:
+        transform .075s linear,
+        opacity .18s ease,
+        filter .18s ease;
+      will-change: transform, opacity;
+    }
+
+    .moveGhost.dropping {
+      opacity: 0;
+      filter: drop-shadow(0 22px 18px rgba(0,0,0,.22));
     }
 
     .moveGhost .unitStack {
@@ -2288,12 +2627,12 @@
 
     .pieceMarker.singlePiece.forceGroup-left .count {
       right: auto !important;
-      left: -37px !important;
+      left: -33px !important;
     }
 
     .pieceMarker.singlePiece.forceGroup-left .unitUndoBtn {
       right: auto !important;
-      left: -69px !important;
+      left: -63px !important;
     }
 
     .pieceMarker.singlePiece.forceGroup-top .count {
@@ -2305,6 +2644,23 @@
     .pieceMarker.singlePiece.forceGroup-bottom .count {
       bottom: -35px !important;
       right: 14px !important;
+    }
+
+    .pieceMarker.singlePiece.forceMoved {
+      animation: forceMarkerSettle .24s ease-out;
+    }
+
+    @keyframes forceMarkerSettle {
+      0% {
+        opacity: .72;
+        filter:
+          drop-shadow(0 0 12px rgba(255,255,255,.8))
+          drop-shadow(0 16px 20px rgba(0,0,0,.38)) !important;
+      }
+      100% {
+        opacity: 1;
+        filter: drop-shadow(0 14px 18px rgba(0,0,0,.46)) !important;
+      }
     }
 
     .pieceMarker.singlePiece .count,
@@ -2359,14 +2715,14 @@
       <button id="viewToggleBtn" class="viewToggleBtn" title="Toggle globe / flat board" aria-label="Toggle globe / flat board">🌐</button>
     </div>
 
-    <div class="jumpBar">
-      <button data-country="Germany">Germany</button>
-      <button data-country="Italy">Italy</button>
-      <button data-country="Japan">Japan</button>
-      <button data-country="UK">UK</button>
-      <button data-country="USA">USA</button>
-      <button data-country="USSR">USSR</button>
-      <button data-country="China">China</button>
+    <div id="powerJumpBar" class="jumpBar" aria-hidden="true">
+      <button data-country="Germany" style="--i:0;">Germany</button>
+      <button data-country="Italy" style="--i:1;">Italy</button>
+      <button data-country="Japan" style="--i:2;">Japan</button>
+      <button data-country="UK" style="--i:3;">UK</button>
+      <button data-country="USA" style="--i:4;">USA</button>
+      <button data-country="USSR" style="--i:5;">USSR</button>
+      <button data-country="China" style="--i:6;">China</button>
     </div>
 
     <div id="commandDrawer" class="commandDrawer">
@@ -2426,6 +2782,22 @@
     </aside>
 
 
+    <button id="powerFloatingButton" class="powerFloatingButton" type="button" aria-label="Toggle power menu" aria-expanded="false" title="Powers">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4.5h7.7c1 0 1.9.3 2.7.9l.6.4c.5.3 1 .5 1.6.5H20v9.2h-3.4c-1 0-1.9-.3-2.7-.9l-.6-.4c-.5-.3-1-.5-1.6-.5H6.4V20H4V4.5Zm2.4 2.4v4.4h5.3c1 0 1.9.3 2.7.9l.6.4c.5.3 1 .5 1.6.5h1V8.7h-1c-1 0-1.9-.3-2.7-.9l-.6-.4c-.5-.3-1-.5-1.6-.5H6.4Z"/>
+      </svg>
+    </button>
+
+    <button id="setupFloatingButton" class="setupFloatingButton" type="button" aria-label="Open game setup" title="Game setup">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="10" y="2" width="4" height="6" rx="1"/>
+        <rect x="10" y="16" width="4" height="6" rx="1"/>
+        <rect x="2" y="10" width="6" height="4" rx="1"/>
+        <rect x="16" y="10" width="6" height="4" rx="1"/>
+        <rect x="10" y="10" width="4" height="4" rx="1"/>
+      </svg>
+    </button>
+
     <button id="gearButton" class="gearButton" type="button" aria-label="Open game controls">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M19.4 13.5c.1-.5.1-1 .1-1.5s0-1-.1-1.5l2.1-1.6-2-3.5-2.5 1a8.4 8.4 0 0 0-2.6-1.5L14 2h-4l-.4 2.9A8.4 8.4 0 0 0 7 6.4l-2.5-1-2 3.5 2.1 1.6c-.1.5-.1 1-.1 1.5s0 1 .1 1.5l-2.1 1.6 2 3.5 2.5-1a8.4 8.4 0 0 0 2.6 1.5L10 22h4l.4-2.9a8.4 8.4 0 0 0 2.6-1.5l2.5 1 2-3.5-2.1-1.6ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
@@ -2456,6 +2828,26 @@
       <div id="dockPanel" class="dockPanel">
         <strong>Details</strong><br>
         <span id="dockSelectedText">Tap a major power, country, sea zone, or piece stack.</span>
+      </div>
+    </div>
+
+    <div id="gameSetupModal" class="gameSetupModal" aria-hidden="true">
+      <div class="gameSetupPanel" role="dialog" aria-modal="true" aria-label="Game setup">
+        <div class="gameSetupHeader">
+          <div class="gameSetupTitle">
+            <strong>Game setup</strong>
+            <span>Edit starting pieces by country or sea zone.</span>
+          </div>
+          <div class="gameSetupActions">
+            <button id="setupViewToggle" class="setupButton" type="button"></button>
+            <button id="setupCloseBtn" class="setupButton" type="button">Close</button>
+          </div>
+        </div>
+        <div id="gameSetupBody" class="gameSetupBody"></div>
+        <div class="gameSetupFooter">
+          <div class="gameSetupHint">Land rows accept land and air pieces. Sea-zone rows accept naval vessels.</div>
+          <button id="setupSaveBtn" class="setupButton primary" type="button"></button>
+        </div>
       </div>
     </div>
   </div>
@@ -2493,9 +2885,24 @@
     let activeLandMove = null;
     let pendingLandMove = null;
     let lastLandMove = null;
+    let landMoveHistory = [];
     let forceGroupIdCounter = 1;
+    let landMoveIdCounter = 1;
     const LAND_UNIT_TYPES = ["tank", "infantry", "fighter", "navy"];
+    const LAND_DISPLAY_UNIT_TYPES = ["tank", "infantry", "fighter"];
     const LAND_MOVE_UNIT_TYPES = new Set(["tank", "infantry", "fighter"]);
+    const SETUP_LAND_COLUMNS = [
+      { key: "tank", label: "Tank", type: "land" },
+      { key: "infantry", label: "Infantry", type: "land" },
+      { key: "fighter", label: "Fighter", type: "land" }
+    ];
+    const SETUP_SEA_COLUMNS = [
+      { key: "carrier", label: "Carrier", type: "sea" },
+      { key: "battleship", label: "Battleship", type: "sea" },
+      { key: "destroyer", label: "Destroyer", type: "sea" },
+      { key: "submarine", label: "Submarine", type: "sea" }
+    ];
+    const SETUP_COLUMNS = [...SETUP_LAND_COLUMNS, ...SETUP_SEA_COLUMNS];
     const MOBILE_LAND_POWERS = new Set();
     const MOBILE_MARKER_INTERIOR_FACTOR = 0.15;
     const MOBILE_MARKER_SMOOTHING = 0.18;
@@ -2620,9 +3027,9 @@
     /* A&A 1942-inspired prototype setup */
     const AA1942_UNIT_OVERRIDES = {
       Germany: { units:{tank:4, infantry:8, fighter:4, navy:5}, zoom:5.8 },
-      Italy: { units:{tank:1, infantry:5, fighter:2, navy:4}, zoom:5.9 },
+      Italy: { units:{tank:1, infantry:5, fighter:2, navy:5}, zoom:5.9 },
       Japan: { units:{tank:3, infantry:8, fighter:4, navy:8}, zoom:5.9 },
-      USA: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.9 },
+      USA: { units:{tank:0, infantry:0, fighter:0, navy:9}, zoom:4.9 },
       "West USA": { units:{tank:1, infantry:2, fighter:1, navy:4}, zoom:5.2 },
       "East USA": { units:{tank:1, infantry:2, fighter:2, navy:3}, zoom:5.2 },
       USSR: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.9 },
@@ -2633,9 +3040,9 @@
       "Far East Russia": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.2 },
       Ukraine: { units:{tank:1, infantry:3, fighter:1, navy:0}, zoom:6.1 },
       Belarus: { units:{tank:1, infantry:2, fighter:0, navy:0}, zoom:6.0 },
-      Crimea: { units:{tank:1, infantry:1, fighter:0, navy:0}, zoom:6.5 },
+      Crimea: { units:{tank:1, infantry:1, fighter:0, navy:1}, zoom:6.5 },
       Latvia: { units:{tank:1, infantry:3, fighter:1, navy:0}, zoom:6.4 },
-      UK: { units:{tank:2, infantry:6, fighter:3, navy:6}, zoom:5.8 },
+      UK: { units:{tank:2, infantry:6, fighter:3, navy:8}, zoom:5.8 },
       China: { units:{tank:0, infantry:6, fighter:1, navy:0}, zoom:5.1 },
       Canada: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.0 },
       "British Columbia": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.5 },
@@ -2819,8 +3226,26 @@
       { name:"SZ 12 Western Pacific", owner:"Japan", lon:151, lat:22, ownerColor:powerColors.Japan, textColor:"#fff", count:4, ships:{carrier:1, battleship:1, destroyer:1, submarine:1} },
       { name:"SZ 13 South China Sea", owner:"Japan", lon:118, lat:17, ownerColor:powerColors.Japan, textColor:"#fff", count:3, ships:{carrier:0, battleship:1, destroyer:1, submarine:1} },
       { name:"SZ 14 Coral Sea", owner:"Australia", lon:152, lat:-17, ownerColor:powerColors.Australia, textColor:"#fff", count:2, ships:{carrier:0, battleship:1, destroyer:1, submarine:0} },
-      { name:"SZ 15 Indian Ocean", owner:"UK", lon:74, lat:-8, ownerColor:powerColors.UK, textColor:"#111827", count:2, ships:{carrier:0, battleship:0, destroyer:1, submarine:1} }
+      { name:"SZ 15 Indian Ocean", owner:"UK", lon:74, lat:-8, ownerColor:powerColors.UK, textColor:"#111827", count:2, ships:{carrier:0, battleship:0, destroyer:1, submarine:1} },
+      { name:"SZ 16 English Channel", owner:"UK", lon:-3.5, lat:50.3, ownerColor:powerColors.UK, textColor:"#111827", count:1, ships:{carrier:0, battleship:0, destroyer:1, submarine:0} },
+      { name:"SZ 17 Barents Sea", owner:"East Russia", lon:39.5, lat:70.5, ownerColor:powerColors.USSR, textColor:"#fff", count:1, ships:{carrier:0, battleship:0, destroyer:1, submarine:0} },
+      { name:"SZ 18 Black Sea", owner:"Crimea", lon:34.5, lat:43.3, ownerColor:powerColors.USSR, textColor:"#fff", count:1, ships:{carrier:0, battleship:0, destroyer:1, submarine:0} },
+      { name:"SZ 19 Arabian Sea", owner:"India", lon:68.5, lat:16.0, ownerColor:powerColors.India, textColor:"#111827", count:1, ships:{carrier:0, battleship:0, destroyer:1, submarine:0} }
     ];
+
+    const COASTAL_FLEET_ANCHORS = {
+      "East Russia": [29.4, 59.7],
+      China: [122.5, 25.4],
+      France: [-5.2, 47.8],
+      Quebec: [-63.5, 49.2],
+      "Nova Scotia": [-61.3, 43.6],
+      India: [73.5, 13.5],
+      Egypt: [32.4, 31.8],
+      Norway: [4.0, 63.2],
+      Greece: [23.5, 36.6],
+      Turkey: [29.2, 40.6],
+      "South Africa": [18.3, -35.3]
+    };
 
     let navalMarkerRefs = [];
 
@@ -2890,8 +3315,8 @@
       const zoomPastReveal = Math.max(0, zoom - revealZoom);
       const closeZoomBoost = Math.max(0, zoom - 6.5);
       const scale = Math.max(
-        0.52,
-        Math.min(2.35, 0.58 + zoomPastReveal * 0.36 + closeZoomBoost * 0.18)
+        0.42,
+        Math.min(2.05, 0.42 + zoomPastReveal * 0.22 + closeZoomBoost * 0.16)
       );
 
       document.querySelectorAll(".pieceMarker.singlePiece .unitCluster, .navalMarker.singlePiece .navalCluster").forEach((el) => {
@@ -3001,14 +3426,21 @@
       neutral: "#eee08e"
     };
 
+    const INITIAL_MAP_VIEW = {
+      center: [14, 52],
+      zoom: 2,
+      pitch: 0,
+      bearing: 0
+    };
+
     const map = new maplibregl.Map({
       container: "map",
-      center: [0, 20],
-      zoom: 1.15,
+      center: INITIAL_MAP_VIEW.center,
+      zoom: INITIAL_MAP_VIEW.zoom,
       minZoom: 0.75,
       maxZoom: 13,
-      pitch: 0,
-      bearing: 0,
+      pitch: INITIAL_MAP_VIEW.pitch,
+      bearing: INITIAL_MAP_VIEW.bearing,
       attributionControl: true,
       renderWorldCopies: false,
       cooperativeGestures: false,
@@ -4085,14 +4517,16 @@
 
       powerMarkers.forEach((country) => {
         initializeForceGroupsForCountry(country);
-        const groups = orderedForceGroupsForCountry(country);
+        const groups = orderedForceGroupsForCountry(country)
+          .filter((force) => hasLandDisplayUnits(force.units));
         if (!groups.length) return;
 
         groups.forEach((force, groupIndex) => {
           const units = force.units || {};
           const point = forceGroupCoordinateForCountry(country, groupIndex, groups.length);
           const el = document.createElement("div");
-          el.className = `pieceMarker singlePiece ${forceGroupLayoutClass(country, force, groupIndex, groups.length)}`;
+          const movedClass = isLastMovedForce(country, force) ? "forceMoved" : "";
+          el.className = `pieceMarker singlePiece ${forceGroupLayoutClass(country, force, groupIndex, groups.length)} ${movedClass}`;
           el.dataset.country = country.name;
           el.dataset.force = force.ownerName;
           el.innerHTML = markerHtml(country, force);
@@ -4102,7 +4536,8 @@
             selectedPowerName = country.name;
             setSelected(
               `${force.ownerName} in ${country.name} · ${country.faction} · GDP ${country.gpt} · ` +
-              `Tanks ${units.tank || 0}, Infantry ${units.infantry || 0}, Fighters ${units.fighter || 0}, Navy ${units.navy || 0}`
+              `Tanks ${units.tank || 0}, Infantry ${units.infantry || 0}, Fighters ${units.fighter || 0}`,
+              { openDock: false }
             );
           });
 
@@ -4133,31 +4568,31 @@
       const units = force.units || {};
       return `
         <div class="unitCluster">
-          ${unitStackHtml("tank", units.tank || 0, force.ownerColor, force)}
-          ${unitStackHtml("infantry", units.infantry || 0, force.ownerColor, force)}
-          ${unitStackHtml("fighter", units.fighter || 0, force.ownerColor, force)}
-          ${unitStackHtml("navy", units.navy || 0, force.ownerColor, force)}
+          ${unitStackHtml("tank", units.tank || 0, force.ownerColor, force, country)}
+          ${unitStackHtml("infantry", units.infantry || 0, force.ownerColor, force, country)}
+          ${unitStackHtml("fighter", units.fighter || 0, force.ownerColor, force, country)}
           <div class="markerName">${forceLabelForZone(country, force)}</div>
         </div>
       `;
     }
 
-    function unitStackHtml(type, count, ownerColor, force = null) {
+    function unitStackHtml(type, count, ownerColor, force = null, country = null) {
       if (!count) return "";
       const moveEnabled = type !== "navy";
+      const undoMove = latestUndoMoveForTarget(country, force, type);
       return `
         <div class="unitStack ${type}" data-unit="${type}" data-count="${count}" title="${moveEnabled ? "Move stack" : "Sea units move later"}">
           ${stackChipsHtml(count)}
           ${iconSvg(type, ownerColor || "#111827")}
           <div class="count">${count}</div>
-          ${isUndoTarget(force, type) ? undoButtonHtml() : ""}
+          ${undoMove ? undoButtonHtml(undoMove.id) : ""}
         </div>
       `;
     }
 
-    function undoButtonHtml() {
+    function undoButtonHtml(moveId) {
       return `
-        <button class="unitUndoBtn" type="button" data-move-undo="true" title="Undo last move" aria-label="Undo last move">
+        <button class="unitUndoBtn" type="button" data-move-undo="true" data-move-id="${moveId}" title="Undo this move" aria-label="Undo this move">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M9 8H4V3"/>
             <path d="M4.5 8.5A8 8 0 1 1 6 18"/>
@@ -4166,9 +4601,25 @@
       `;
     }
 
-    function isUndoTarget(force, type) {
-      if (!force || !lastLandMove) return false;
-      return lastLandMove.type === type && lastLandMove.toForceId === force.id;
+    function latestUndoMoveForTarget(country, force, type) {
+      if (!country || !force || !landMoveHistory.length) return null;
+      for (let i = landMoveHistory.length - 1; i >= 0; i--) {
+        const move = landMoveHistory[i];
+        if (
+          move.type === type &&
+          move.toForceId === force.id &&
+          (move.toCountryKey === country.countryKey || move.toCountryName === country.name)
+        ) {
+          return move;
+        }
+      }
+      return null;
+    }
+
+    function isLastMovedForce(country, force) {
+      if (!country || !force || !lastLandMove) return false;
+      return lastLandMove.toForceId === force.id &&
+        (lastLandMove.toCountryKey === country.countryKey || lastLandMove.toCountryName === country.name);
     }
 
     function initializeForceGroupsForCountry(country) {
@@ -4208,6 +4659,10 @@
 
     function hasAnyUnits(units = {}) {
       return LAND_UNIT_TYPES.some((type) => Number(units[type] || 0) > 0);
+    }
+
+    function hasLandDisplayUnits(units = {}) {
+      return LAND_DISPLAY_UNIT_TYPES.some((type) => Number(units[type] || 0) > 0);
     }
 
     function activeForceGroups(country) {
@@ -4261,12 +4716,12 @@
       if (groupCount <= 1) return [country.lon, country.lat];
 
       const offsets = [
-        [-1.18, -0.08],
-        [1.18, 0.12],
-        [-0.20, 1.03],
-        [0.24, -1.03],
-        [-1.35, 0.86],
-        [1.35, -0.86]
+        [-0.72, -0.04],
+        [0.72, 0.06],
+        [-0.08, 0.62],
+        [0.10, -0.62],
+        [-0.92, 0.46],
+        [0.92, -0.46]
       ];
       const [x, y] = offsets[groupIndex % offsets.length];
       const spread = multiForceSpreadForCountry(country);
@@ -4274,10 +4729,10 @@
     }
 
     function multiForceSpreadForCountry(country) {
-      if (country.name === "Poland") return 1.75;
-      if (country.gpt >= 12) return 1.95;
-      if (country.gpt >= 6) return 1.65;
-      return 1.45;
+      if (country.name === "Poland") return 0.95;
+      if (country.gpt >= 12) return 1.1;
+      if (country.gpt >= 6) return 0.95;
+      return 0.85;
     }
 
     function forceGroupLayoutClass(country, force, groupIndex, groupCount) {
@@ -4334,7 +4789,7 @@
         button.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
-          undoLastLandMove();
+          undoLandMoveById(button.dataset.moveId);
         });
       });
     }
@@ -4441,12 +4896,19 @@
       event.preventDefault();
       const move = activeLandMove;
       const wasValid = move.valid && move.dropZoneName;
-      cleanupLandDrag();
 
       if (wasValid) {
-        applyLandMove(move, move.dropZoneName);
+        move.ghost?.classList.add("dropping");
+        window.setTimeout(() => {
+          if (activeLandMove === move) {
+            cleanupLandDrag();
+            applyLandMove(move, move.dropZoneName);
+          }
+        }, 95);
         return;
       }
+
+      cleanupLandDrag();
 
       if (statusPill) statusPill.textContent = "Move cancelled";
     }
@@ -4523,7 +4985,8 @@
       syncCountryUnitsFromGroups(source);
       syncCountryUnitsFromGroups(target);
 
-      lastLandMove = {
+      const historyEntry = {
+        id: `move-${landMoveIdCounter++}`,
         type: move.type,
         quantity,
         fromCountryKey: source.countryKey,
@@ -4537,17 +5000,32 @@
         toForceId: targetForce.id,
         toForce: forceSnapshot(targetForce)
       };
+      landMoveHistory.push(historyEntry);
+      lastLandMove = historyEntry;
 
       selectedPowerName = target.name;
       refreshLandPieceMarkers();
-      setSelected(`${quantity} ${sourceForce.ownerName} ${unitLabel(move.type)} moved from ${source.name} to ${target.name}.`);
+      setSelected(`${quantity} ${sourceForce.ownerName} ${unitLabel(move.type)} moved from ${source.name} to ${target.name}.`, { openDock: false });
       if (statusPill) statusPill.textContent = `Moved ${quantity} ${unitLabel(move.type)} to ${target.name}`;
     }
 
     function undoLastLandMove() {
-      if (!lastLandMove) return;
+      undoLandMoveById(lastLandMove?.id || null);
+    }
 
-      const move = lastLandMove;
+    function undoLandMoveById(moveId = null) {
+      if (!landMoveHistory.length && !lastLandMove) return;
+
+      let historyIndex = -1;
+      if (moveId) {
+        historyIndex = landMoveHistory.findIndex((entry) => entry.id === moveId);
+      }
+      if (historyIndex < 0) {
+        historyIndex = landMoveHistory.length - 1;
+      }
+
+      const move = landMoveHistory[historyIndex] || lastLandMove;
+      if (!move) return;
       const source = findCountryByIdentity(move.fromCountryKey, move.fromCountryName);
       const target = findCountryByIdentity(move.toCountryKey, move.toCountryName);
       if (!source || !target) return;
@@ -4569,10 +5047,13 @@
       syncCountryUnitsFromGroups(source);
       syncCountryUnitsFromGroups(target);
 
-      lastLandMove = null;
+      if (historyIndex >= 0) {
+        landMoveHistory.splice(historyIndex, 1);
+      }
+      lastLandMove = landMoveHistory[landMoveHistory.length - 1] || null;
       selectedPowerName = source.name;
       refreshLandPieceMarkers();
-      setSelected(`Undid ${quantity} ${move.fromForce.ownerName} ${unitLabel(move.type)} from ${target.name} to ${source.name}.`);
+      setSelected(`Undid ${quantity} ${move.fromForce.ownerName} ${unitLabel(move.type)} from ${target.name} to ${source.name}.`, { openDock: false });
       if (statusPill) statusPill.textContent = "Move undone";
     }
 
@@ -4837,7 +5318,8 @@
           setSelected(
             `${zone.name} · ${zone.owner} · ` +
             `Carriers ${ships.carrier || 0}, Battleships ${ships.battleship || 0}, ` +
-            `Destroyers ${ships.destroyer || 0}, Subs ${ships.submarine || 0}`
+            `Destroyers ${ships.destroyer || 0}, Subs ${ships.submarine || 0}`,
+            { openDock: false }
           );
         });
 
@@ -4857,6 +5339,96 @@
           lat: zone.lat
         });
       });
+
+      createCoastalFleetMarkers();
+    }
+
+    function createCoastalFleetMarkers() {
+      powerMarkers.forEach((country) => {
+        const navyCount = Math.max(0, Number(country.units?.navy || 0));
+        if (!navyCount) return;
+
+        const detailedCount = detailedNavalCountForCountry(country);
+        const coastalCount = Math.max(0, navyCount - detailedCount);
+        if (!coastalCount) return;
+
+        const point = coastalFleetCoordinateForCountry(country);
+        if (!point) return;
+
+        const el = document.createElement("div");
+        el.className = "navalMarker singlePiece coastalFleetMarker";
+        el.dataset.zone = `${country.name} Fleet`;
+        el.dataset.country = country.name;
+        el.innerHTML = coastalFleetMarkerHtml(country, coastalCount);
+
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          setSelected(
+            `${country.name} fleet · ${coastalCount} naval ${coastalCount === 1 ? "piece" : "pieces"}`,
+            { openDock: false }
+          );
+        });
+
+        const marker = new maplibregl.Marker({
+          element: el,
+          anchor: "center",
+          occludedOpacity: 0
+        })
+          .setLngLat(point)
+          .addTo(map);
+
+        navalMarkerRefs.push({
+          marker,
+          zone: {
+            name: `${country.name} Fleet`,
+            owner: country.name,
+            lon: point[0],
+            lat: point[1],
+            ownerColor: country.ownerColor,
+            ships: { carrier: 0, battleship: 0, destroyer: coastalCount, submarine: 0 }
+          },
+          element: el,
+          lon: point[0],
+          lat: point[1],
+          coastalFleet: true,
+          country
+        });
+      });
+    }
+
+    function coastalFleetMarkerHtml(country, count) {
+      return `
+        <div class="navalCluster">
+          ${navalStackHtml("destroyer", count, country.ownerColor)}
+          <div class="seaZoneName">${country.name} Fleet</div>
+        </div>
+      `;
+    }
+
+    function detailedNavalCountForCountry(country) {
+      const ownerName = detailedNavalOwnerName(country);
+      return navalZones
+        .filter((zone) => zone.owner === ownerName)
+        .reduce((total, zone) => total + navalShipCount(zone.ships), 0);
+    }
+
+    function detailedNavalOwnerName(country) {
+      if (country.name === "West USA" || country.name === "East USA") return "USA";
+      if (country.countryKey === "United Kingdom" || country.name === "UK") return "UK";
+      return country.name;
+    }
+
+    function navalShipCount(ships = {}) {
+      return ["carrier", "battleship", "destroyer", "submarine"]
+        .reduce((total, type) => total + Math.max(0, Number(ships[type] || 0)), 0);
+    }
+
+    function coastalFleetCoordinateForCountry(country) {
+      const anchor = COASTAL_FLEET_ANCHORS[country.countryKey] || COASTAL_FLEET_ANCHORS[country.name];
+      if (anchor) return anchor;
+
+      const legacyAnchor = LAND_UNIT_ANCHORS[country.countryKey] || LAND_UNIT_ANCHORS[country.name];
+      return legacyAnchor?.navy || null;
     }
 
     function navalMarkerHtml(zone) {
@@ -4935,7 +5507,8 @@
     }
 
 
-    function setSelected(text) {
+    function setSelected(text, options = {}) {
+      const openDock = options.openDock !== false;
       if (selectedText) selectedText.textContent = text;
       if (selectedText2) selectedText2.textContent = text;
 
@@ -4950,7 +5523,7 @@
           `<strong>Selected</strong><br>${text}<br><br>` +
           `<span class="dockChip">Move</span><span class="dockChip">Attack</span><span class="dockChip">Inspect</span>`;
       }
-      if (dock) {
+      if (openDock && dock) {
         dock.classList.add("open");
         activeDockTab = "details";
       }
@@ -5011,19 +5584,19 @@
               p.y < -pad || p.y > height + pad;
           }
 
-          if (!hide && viewMode !== "flatBoard") {
-            // Globe: hide edge/far-side pieces so they don't ghost around the curve.
-            const angular = angularDistanceDegrees(center.lng, center.lat, lngLat.lon, lngLat.lat);
-            const maxAngle =
-              zoom < 3
-                ? (forcePieces ? 180 : 0)
-                : zoom < 4.5
-                  ? (forcePieces ? 120 : 0)
-                  : zoom < 5.5
-                    ? 44
-                    : zoom < 7
-                      ? 36
-                      : 30;
+      if (!hide && viewMode !== "flatBoard") {
+        // Globe: hide edge/far-side pieces so they don't ghost around the curve.
+        const angular = angularDistanceDegrees(center.lng, center.lat, lngLat.lon, lngLat.lat);
+        const maxAngle =
+          zoom < 3
+            ? 180
+            : zoom < 4.5
+              ? 76
+              : zoom < 5.5
+                ? 44
+                : zoom < 7
+                  ? 36
+                  : 30;
 
             const offScreenCore =
               !Number.isFinite(p.x) || !Number.isFinite(p.y) ||
@@ -5061,10 +5634,19 @@
     }
 
 
-    const PIECE_REVEAL_ZOOM = 4.5;
+    const PIECE_REVEAL_ZOOM = 3.5;
+    const MIN_FORCED_PIECE_REVEAL_ZOOM = 3.5;
 
     function getPieceRevealZoom() {
-      return viewMode === "flatBoard" ? 3.5 : 4.5;
+      return PIECE_REVEAL_ZOOM;
+    }
+
+    function forcedRevealAllowed(zoom = map.getZoom()) {
+      return zoom >= MIN_FORCED_PIECE_REVEAL_ZOOM;
+    }
+
+    function piecesVisibleAtZoom(zoom = map.getZoom()) {
+      return zoom >= getPieceRevealZoom() || (forcePieces === true && forcedRevealAllowed(zoom));
     }
 
     function updateViewToggleButtons() {
@@ -5098,7 +5680,8 @@
     function updateUiState() {
       const zoom = map.getZoom();
       const revealZoom = getPieceRevealZoom();
-      const piecesVisible = forcePieces === true || zoom >= revealZoom;
+      const forceRevealReady = forcedRevealAllowed(zoom);
+      const piecesVisible = piecesVisibleAtZoom(zoom);
       const surfaceMode = piecesVisible;
 
       app.classList.toggle("piecesVisible", piecesVisible);
@@ -5121,12 +5704,14 @@
       updateMarkerHemisphereVisibility(piecesVisible);
 
       if (statusPill) {
-        if (forcePieces) {
+        if (forcePieces && forceRevealReady) {
           statusPill.textContent = "Reveal Pieces is ON: land and naval stacks are visible.";
+        } else if (forcePieces) {
+          statusPill.textContent = `Reveal Pieces is ON: zoom to ${MIN_FORCED_PIECE_REVEAL_ZOOM}+ to show land and naval stacks.`;
         } else if (piecesVisible) {
           statusPill.textContent = `Zoom ${revealZoom}+: land and naval stacks are active.`;
         } else {
-          statusPill.textContent = `Pieces hidden until zoom ${revealZoom}+ or Reveal Pieces is toggled.`;
+          statusPill.textContent = `Pieces hidden until zoom ${revealZoom}+ or Reveal Pieces at zoom ${MIN_FORCED_PIECE_REVEAL_ZOOM}+.`;
         }
       }
 
@@ -5192,13 +5777,15 @@
     function fitGlobe() {
       forcePieces = false;
       map.easeTo({
-        center: [0, 20],
-        zoom: viewMode === "flatBoard" ? 1.05 : 1.15,
-        pitch: 0,
-        bearing: 0,
+        center: INITIAL_MAP_VIEW.center,
+        zoom: INITIAL_MAP_VIEW.zoom,
+        pitch: INITIAL_MAP_VIEW.pitch,
+        bearing: INITIAL_MAP_VIEW.bearing,
         duration: 900,
         essential: true
       });
+      window.setTimeout(updateUiState, 50);
+      map.once("moveend", updateUiState);
     }
 
 
@@ -5278,6 +5865,8 @@
 
     let activeDockTab = null;
     let selectedPowerName = "Germany";
+    let gameSetupDraft = null;
+    let gameSetupMode = "table";
 
     function closeDock() {
       const dock = document.getElementById("gameDock");
@@ -5350,6 +5939,229 @@
       `;
     }
 
+    function setupButtonIcon(type) {
+      if (type === "save") {
+        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l2 2v16H5V3Zm3 2v5h8V5H8Zm0 10v4h8v-4H8Z"/></svg>`;
+      }
+      if (type === "json") {
+        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 7-5 5 5 5 1.5-1.5L6 12l3.5-3.5L8 7Zm8 0-1.5 1.5L18 12l-3.5 3.5L16 17l5-5-5-5ZM11.5 19h2l-1-14h-2l1 14Z"/></svg>`;
+      }
+      if (type === "table") {
+        return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h18v16H3V4Zm2 2v3h14V6H5Zm0 5v3h4v-3H5Zm6 0v3h8v-3h-8Zm-6 5v2h4v-2H5Zm6 0v2h8v-2h-8Z"/></svg>`;
+      }
+      return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v4h-4V3ZM3 10h4v4H3v-4Zm14 0h4v4h-4v-4ZM10 17h4v4h-4v-4Zm0-7h4v4h-4v-4Z"/></svg>`;
+    }
+
+    function openGameSetupModal() {
+      gameSetupDraft = currentGameSetupData();
+      gameSetupMode = "table";
+      renderGameSetupModal();
+    }
+
+    function closeGameSetupModal() {
+      const modal = document.getElementById("gameSetupModal");
+      if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+      }
+    }
+
+    function currentGameSetupData() {
+      return {
+        countries: powerMarkers.map((country) => ({
+          key: country.countryKey,
+          name: country.name,
+          faction: country.faction || "",
+          pieces: Object.fromEntries(SETUP_LAND_COLUMNS.map((col) => [
+            col.key,
+            Math.max(0, Number(country.units?.[col.key] || 0))
+          ]))
+        })),
+        seaZones: navalZones.map((zone) => ({
+          key: zone.name,
+          name: zone.name,
+          owner: zone.owner,
+          pieces: Object.fromEntries(SETUP_SEA_COLUMNS.map((col) => [
+            col.key,
+            Math.max(0, Number(zone.ships?.[col.key] || 0))
+          ]))
+        }))
+      };
+    }
+
+    function renderGameSetupModal() {
+      const modal = document.getElementById("gameSetupModal");
+      const body = document.getElementById("gameSetupBody");
+      const toggle = document.getElementById("setupViewToggle");
+      const save = document.getElementById("setupSaveBtn");
+      const close = document.getElementById("setupCloseBtn");
+      if (!modal || !body || !toggle || !save || !close) return;
+
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+      if (!gameSetupDraft) gameSetupDraft = currentGameSetupData();
+
+      body.innerHTML = gameSetupMode === "json"
+        ? renderGameSetupJson()
+        : renderGameSetupTable();
+
+      toggle.innerHTML = gameSetupMode === "json"
+        ? `${setupButtonIcon("table")} View table`
+        : `${setupButtonIcon("json")} View JSON`;
+      save.innerHTML = `${setupButtonIcon("save")} Save`;
+
+      toggle.onclick = () => {
+        updateGameSetupDraftFromInputs();
+        gameSetupMode = gameSetupMode === "json" ? "table" : "json";
+        renderGameSetupModal();
+      };
+      save.onclick = saveGameSetupModal;
+      close.onclick = closeGameSetupModal;
+
+      body.querySelectorAll(".setupNumber").forEach((input) => {
+        input.addEventListener("input", () => updateGameSetupDraftFromInputs());
+      });
+    }
+
+    function renderGameSetupTable() {
+      const columns = SETUP_COLUMNS.map((col) => `<th>${setupPieceHeader(col)}</th>`).join("");
+      const countryRows = gameSetupDraft.countries
+        .map((row) => setupMatrixRow("country", row))
+        .join("");
+      const seaRows = gameSetupDraft.seaZones
+        .map((row) => setupMatrixRow("sea", row))
+        .join("");
+
+      return `
+        <div class="setupTableWrap">
+          <table class="setupMatrix" aria-label="Game setup piece matrix">
+            <thead>
+              <tr><th>Country / Zone</th>${columns}</tr>
+            </thead>
+            <tbody>
+              ${countryRows}
+              ${seaRows}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function setupPieceHeader(col) {
+      const icon = col.type === "sea"
+        ? navyIconSvg(col.key, "#334155")
+        : iconSvg(col.key, "#334155");
+      return `<span class="setupPieceHead">${icon}<span>${col.label}</span></span>`;
+    }
+
+    function setupMatrixRow(scope, row) {
+      const isSea = scope === "sea";
+      const cells = SETUP_COLUMNS.map((col) => {
+        const enabled = isSea ? col.type === "sea" : col.type === "land";
+        const source = isSea ? row.pieces : row.pieces;
+        const value = enabled ? Math.max(0, Number(source[col.key] || 0)) : 0;
+        return `
+          <td>
+            <input class="setupNumber" type="number" min="0" step="1" inputmode="numeric"
+              value="${value}" ${enabled ? "" : "disabled"}
+              data-setup-scope="${scope}" data-setup-key="${escapeHtml(row.key)}" data-piece="${col.key}">
+          </td>
+        `;
+      }).join("");
+
+      return `
+        <tr>
+          <td>
+            <div class="setupRowName">
+              ${escapeHtml(row.name)}
+              <span>${isSea ? `Sea zone · ${escapeHtml(row.owner)}` : `Country zone · ${escapeHtml(row.faction || "Power")}`}</span>
+            </div>
+          </td>
+          ${cells}
+        </tr>
+      `;
+    }
+
+    function renderGameSetupJson() {
+      updateGameSetupDraftFromInputs();
+      return `<pre class="setupJsonView" aria-label="Readonly setup JSON">${escapeHtml(JSON.stringify(gameSetupDraft, null, 2))}</pre>`;
+    }
+
+    function updateGameSetupDraftFromInputs() {
+      if (!gameSetupDraft) return;
+      document.querySelectorAll(".setupNumber[data-setup-scope]:not(:disabled)").forEach((input) => {
+        const scope = input.dataset.setupScope;
+        const key = input.dataset.setupKey;
+        const piece = input.dataset.piece;
+        const value = Math.max(0, Number(input.value || 0));
+        const collection = scope === "sea" ? gameSetupDraft.seaZones : gameSetupDraft.countries;
+        const row = collection.find((item) => item.key === key);
+        if (row?.pieces && piece) row.pieces[piece] = value;
+      });
+    }
+
+    function saveGameSetupModal() {
+      updateGameSetupDraftFromInputs();
+      applyGameSetupData(gameSetupDraft);
+      closeGameSetupModal();
+      setSelected("Game setup saved. Pieces have been updated on the map.", { openDock: false });
+      if (activeDockTab) renderDockPanel(activeDockTab);
+      if (statusPill) statusPill.textContent = "Game setup saved";
+    }
+
+    function applyGameSetupData(setup) {
+      if (!setup) return;
+      landMoveHistory = [];
+      lastLandMove = null;
+
+      setup.seaZones.forEach((row) => {
+        const zone = navalZones.find((item) => item.name === row.key || item.name === row.name);
+        if (!zone) return;
+        SETUP_SEA_COLUMNS.forEach((col) => {
+          zone.ships[col.key] = Math.max(0, Number(row.pieces?.[col.key] || 0));
+        });
+        zone.count = navalShipCount(zone.ships);
+      });
+
+      setup.countries.forEach((row) => {
+        const country = powerMarkers.find((item) => item.countryKey === row.key || item.name === row.name);
+        if (!country) return;
+        const existingNavy = Math.max(0, Number(country.units?.navy || 0));
+        country.units = normalizeUnitCounts({
+          tank: row.pieces?.tank || 0,
+          infantry: row.pieces?.infantry || 0,
+          fighter: row.pieces?.fighter || 0,
+          navy: navyCountForCountryAfterSetup(country, existingNavy)
+        });
+        country.forceGroups = hasAnyUnits(country.units)
+          ? [createForceGroup(country, country, country.units)]
+          : [];
+        syncCountryUnitsFromGroups(country);
+      });
+
+      refreshLandPieceMarkers();
+      createNavalMarkers();
+      updatePlacedCount();
+      syncPhysicalPieceZoomState();
+      updateUiState();
+    }
+
+    function navyCountForCountryAfterSetup(country, fallback) {
+      if (country.name === "West USA" || country.name === "East USA") return fallback;
+      const ownerName = detailedNavalOwnerName(country);
+      const hasDetailedZones = navalZones.some((zone) => zone.owner === ownerName);
+      return hasDetailedZones ? detailedNavalCountForCountry(country) : fallback;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function renderDockPanel(tab) {
       const panel = document.getElementById("dockPanel");
       const selected = document.getElementById("dockSelectedText");
@@ -5372,12 +6184,15 @@
       }
 
       if (tab === "hud") {
+        const revealState = forcePieces
+          ? (zoom >= MIN_FORCED_PIECE_REVEAL_ZOOM ? "ON" : `ON · zoom ${MIN_FORCED_PIECE_REVEAL_ZOOM}+`)
+          : "OFF";
         panel.innerHTML =
           `<strong style="display:block;font-size:15px;margin-bottom:6px;color:#334155;">HUD</strong>` +
           `<div style="line-height:1.55;color:#475569;">` +
           `<div><span style="font-weight:700;">Board mode:</span> ${boardMode}</div>` +
           `<div><span style="font-weight:700;">Colours:</span> ${colourLabel}</div>` +
-          `<div><span style="font-weight:700;">Zoom:</span> ${zoom.toFixed(1)} &nbsp;&nbsp; <span style="font-weight:700;">Reveal:</span> ${forcePieces ? "ON" : "OFF"}</div>` +
+          `<div><span style="font-weight:700;">Zoom:</span> ${zoom.toFixed(1)} &nbsp;&nbsp; <span style="font-weight:700;">Reveal:</span> ${revealState}</div>` +
           `<div><span style="font-weight:700;">Auto reveal:</span> ${revealZoom}+ &nbsp;&nbsp; <span style="font-weight:700;">View:</span> ${viewMode === "flatBoard" ? "Flat board" : "Globe"}</div>` +
           `</div>` +
           `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">` +
@@ -5393,7 +6208,7 @@
         panel.innerHTML =
           `<strong style="display:block;font-size:15px;margin-bottom:6px;color:#334155;">Pieces</strong>` +
           `<div style="line-height:1.55;color:#475569;">Land: infantry · tank · fighter · artillery<br>Sea: carrier · battleship · destroyer · submarine</div>` +
-          `<div style="margin-top:12px;color:#64748b;">Pieces reveal automatically at zoom ${revealZoom}+ or when Reveal Pieces is toggled on.</div>`;
+          `<div style="margin-top:12px;color:#64748b;">Pieces reveal automatically at zoom ${revealZoom}+ or when Reveal Pieces is toggled on at zoom ${MIN_FORCED_PIECE_REVEAL_ZOOM}+.</div>`;
         return;
       }
 
@@ -5440,6 +6255,49 @@
       event.stopPropagation();
     });
 
+    function setPowerMenuOpen(open) {
+      const menu = document.getElementById("powerJumpBar");
+      const button = document.getElementById("powerFloatingButton");
+      if (!menu || !button) return;
+      menu.classList.toggle("open", open);
+      menu.setAttribute("aria-hidden", String(!open));
+      button.classList.toggle("open", open);
+      button.setAttribute("aria-expanded", String(open));
+    }
+
+    function togglePowerMenu() {
+      const menu = document.getElementById("powerJumpBar");
+      setPowerMenuOpen(!menu?.classList.contains("open"));
+    }
+
+    document.getElementById("powerJumpBar")?.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+
+    document.getElementById("powerJumpBar")?.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+
+    document.getElementById("powerFloatingButton")?.addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+
+    document.getElementById("powerFloatingButton")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      togglePowerMenu();
+    });
+
+    document.getElementById("setupFloatingButton").addEventListener("pointerdown", (event) => {
+      event.stopPropagation();
+    });
+
+    document.getElementById("setupFloatingButton").addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openGameSetupModal();
+    });
+
     document.getElementById("gearButton").addEventListener("pointerdown", (event) => {
       event.stopPropagation();
     });
@@ -5469,6 +6327,10 @@
       const modeBtn2 = document.getElementById("modeBtn2");
       const fitBtn = document.getElementById("fitBtn");
       const fitBtn2 = document.getElementById("fitBtn2");
+
+      document.querySelectorAll("#powerJumpBar [data-country]").forEach((button, index) => {
+        button.style.setProperty("--i", index);
+      });
 
       if (zoomIn && !zoomIn.dataset.bound) {
         zoomIn.dataset.bound = "true";
@@ -5535,7 +6397,7 @@
     bindPrimaryControls();
 
     map.on("render", () => {
-      const piecesVisible = forcePieces === true || map.getZoom() >= getPieceRevealZoom();
+      const piecesVisible = piecesVisibleAtZoom();
       if (countryMarkers.length || navalMarkerRefs.length) {
         syncMobileLargeCountryMarkers();
         syncPhysicalPieceZoomState();
