@@ -2175,6 +2175,138 @@
       top: 14px !important;
     }
 
+    .pieceMarker.singlePiece .unitStack[data-unit] {
+      cursor: grab !important;
+      touch-action: none !important;
+    }
+
+    .pieceMarker.singlePiece .unitStack[data-unit]:active {
+      cursor: grabbing !important;
+    }
+
+    .pieceMarker.singlePiece .unitStack.navy[data-unit] {
+      cursor: default !important;
+    }
+
+    .pieceMarker.singlePiece .unitStack.moveSource {
+      filter: drop-shadow(0 0 10px rgba(255,255,255,.95)) !important;
+    }
+
+    .moveQuantityPicker {
+      position: fixed;
+      z-index: 5000;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 42px;
+      max-height: 208px;
+      padding: 7px;
+      overflow-y: auto;
+      border-radius: 999px;
+      background: rgba(15,23,42,.82);
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow: 0 18px 34px rgba(0,0,0,.42);
+      backdrop-filter: blur(14px);
+    }
+
+    .moveQuantityPicker button {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 2px solid #94a3b8;
+      background: #fff;
+      color: #111827;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: grab;
+      box-shadow: 0 6px 12px rgba(0,0,0,.24);
+    }
+
+    .moveQuantityPicker button:active {
+      cursor: grabbing;
+      transform: translateY(1px);
+    }
+
+    .moveGhost {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 4999;
+      width: 72px;
+      height: 72px;
+      pointer-events: none;
+      transform: translate3d(-9999px, -9999px, 0);
+      filter: drop-shadow(0 18px 18px rgba(0,0,0,.42));
+    }
+
+    .moveGhost .unitStack {
+      position: relative !important;
+      left: 0 !important;
+      top: 0 !important;
+      transform: scale(1.08) !important;
+      transform-origin: center center !important;
+    }
+
+    .moveGhost.valid .unitStack {
+      filter: drop-shadow(0 0 9px rgba(34,197,94,.9));
+    }
+
+    .moveGhost.invalid .unitStack {
+      opacity: .58;
+      filter: grayscale(.85) drop-shadow(0 0 9px rgba(220,38,38,.92));
+    }
+
+    .pieceMarker.singlePiece .unitUndoBtn {
+      position: absolute;
+      right: -35px;
+      bottom: -3px;
+      width: 25px;
+      height: 25px;
+      border-radius: 999px;
+      border: 2px solid #94a3b8;
+      background: #fff;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+      box-shadow: 0 7px 14px rgba(0,0,0,.28);
+      z-index: 4;
+    }
+
+    .pieceMarker.singlePiece .unitUndoBtn svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .pieceMarker.singlePiece.forceGroup-left .count {
+      right: auto !important;
+      left: -37px !important;
+    }
+
+    .pieceMarker.singlePiece.forceGroup-left .unitUndoBtn {
+      right: auto !important;
+      left: -69px !important;
+    }
+
+    .pieceMarker.singlePiece.forceGroup-top .count {
+      bottom: auto !important;
+      top: -31px !important;
+      right: 14px !important;
+    }
+
+    .pieceMarker.singlePiece.forceGroup-bottom .count {
+      bottom: -35px !important;
+      right: 14px !important;
+    }
+
     .pieceMarker.singlePiece .count,
     .navalMarker.singlePiece .count {
       background: rgba(255,255,255,.96) !important;
@@ -2356,7 +2488,15 @@
     let viewMode = "globe";
     let forcePieces = false;
     let countryMarkers = [];
-    const MOBILE_LAND_POWERS = new Set(["USA", "USSR", "Canada"]);
+    let landZoneFeatures = [];
+    const landZoneFeatureByName = new Map();
+    let activeLandMove = null;
+    let pendingLandMove = null;
+    let lastLandMove = null;
+    let forceGroupIdCounter = 1;
+    const LAND_UNIT_TYPES = ["tank", "infantry", "fighter", "navy"];
+    const LAND_MOVE_UNIT_TYPES = new Set(["tank", "infantry", "fighter"]);
+    const MOBILE_LAND_POWERS = new Set();
     const MOBILE_MARKER_INTERIOR_FACTOR = 0.15;
     const MOBILE_MARKER_SMOOTHING = 0.18;
     const BALTIC_COMPONENT_COUNTRIES = ["Estonia", "Latvia", "Lithuania"];
@@ -2392,8 +2532,15 @@
 
       "United States of America": { name:"USA", ownerColor:powerColors.USA, textColor:"#fff", faction:"Allies", gpt:20, lon:-98.57, lat:39.82, zoom:4.7, units:{tank:5, infantry:7, fighter:5, navy:8} },
       "United States": { name:"USA", ownerColor:powerColors.USA, textColor:"#fff", faction:"Allies", gpt:20, lon:-98.57, lat:39.82, zoom:4.7, units:{tank:5, infantry:7, fighter:5, navy:8} },
+      "West USA": { name:"West USA", ownerColor:powerColors.USA, textColor:"#fff", faction:"Allies", gpt:9, lon:-116.2, lat:39.8, zoom:5.2, units:{tank:1, infantry:2, fighter:1, navy:4} },
+      "East USA": { name:"East USA", ownerColor:powerColors.USA, textColor:"#fff", faction:"Allies", gpt:11, lon:-84.0, lat:39.2, zoom:5.2, units:{tank:1, infantry:2, fighter:2, navy:3} },
       "United Kingdom": { name:"UK", ownerColor:powerColors.UK, textColor:"#111827", faction:"Allies", gpt:15, lon:-2.0, lat:54.0, zoom:5.7, units:{tank:3, infantry:5, fighter:4, navy:8} },
       Russia: { name:"USSR", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:19, lon:65.0, lat:60.0, zoom:4.6, units:{tank:5, infantry:8, fighter:3, navy:2} },
+      "West Russia": { name:"West Russia", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:0, lon:27.6, lat:57.6, zoom:5.7, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      "East Russia": { name:"East Russia", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:19, lon:38.1, lat:55.6, zoom:5.6, units:{tank:2, infantry:10, fighter:2, navy:1} },
+      "Central Russia": { name:"Central Russia", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:0, lon:66.0, lat:58.5, zoom:4.9, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      Siberia: { name:"Siberia", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:0, lon:102.0, lat:61.0, zoom:4.4, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      "Far East Russia": { name:"Far East Russia", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:0, lon:146.0, lat:60.0, zoom:4.2, units:{tank:0, infantry:0, fighter:0, navy:0} },
       Ukraine: { name:"Ukraine", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:4, lon:31.1, lat:49.1, zoom:6.1, units:{tank:1, infantry:3, fighter:1, navy:0} },
       Belarus: { name:"Belarus", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:3, lon:28.0, lat:53.4, zoom:6.0, units:{tank:1, infantry:2, fighter:0, navy:0} },
       Crimea: { name:"Crimea", ownerColor:powerColors.USSR, textColor:"#fff", faction:"USSR", gpt:2, lon:34.1, lat:45.2, zoom:6.5, units:{tank:1, infantry:1, fighter:0, navy:0} },
@@ -2401,6 +2548,18 @@
       China: { name:"China", ownerColor:powerColors.China, textColor:"#fff", faction:"Allies", gpt:13, lon:104.0, lat:35.0, zoom:4.9, units:{tank:1, infantry:7, fighter:1, navy:2} },
       France: { name:"France", ownerColor:powerColors.MinorAllies, textColor:"#fff", faction:"Allies", gpt:12, lon:2.2, lat:46.2, zoom:5.9, units:{tank:2, infantry:4, fighter:2, navy:1} },
       Canada: { name:"Canada", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:8, lon:-106.3, lat:56.1, zoom:4.8, units:{tank:2, infantry:3, fighter:2, navy:2} },
+      "British Columbia": { name:"British Columbia", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-124.4, lat:54.0, zoom:5.5, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      Yukon: { name:"Yukon", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-135.0, lat:64.0, zoom:5.2, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      "Northwest Territories": { name:"Northwest Territories", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-96.0, lat:65.0, zoom:4.8, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      Alberta: { name:"Alberta", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-114.4, lat:54.0, zoom:5.7, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      Saskatchewan: { name:"Saskatchewan", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-106.5, lat:54.2, zoom:5.7, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      Manitoba: { name:"Manitoba", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-98.0, lat:54.3, zoom:5.7, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      Ontario: { name:"Ontario", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:3, lon:-84.4, lat:49.2, zoom:5.7, units:{tank:1, infantry:2, fighter:1, navy:0} },
+      Quebec: { name:"Quebec", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:3, lon:-71.6, lat:50.8, zoom:5.6, units:{tank:1, infantry:2, fighter:1, navy:1} },
+      "New Brunswick": { name:"New Brunswick", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-66.4, lat:46.4, zoom:6.6, units:{tank:0, infantry:0, fighter:0, navy:0} },
+      "Nova Scotia": { name:"Nova Scotia", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-63.2, lat:45.1, zoom:6.6, units:{tank:0, infantry:1, fighter:0, navy:1} },
+      PEI: { name:"PEI", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-63.2, lat:46.3, zoom:7.0, units:{tank:0, infantry:1, fighter:0, navy:0} },
+      Newfoundland: { name:"Newfoundland", ownerColor:powerColors.Canada, textColor:"#fff", faction:"Allies", gpt:1, lon:-56.2, lat:49.3, zoom:6.3, units:{tank:0, infantry:0, fighter:0, navy:0} },
       Australia: { name:"Australia", ownerColor:powerColors.Australia, textColor:"#fff", faction:"Allies", gpt:7, lon:134.0, lat:-25.0, zoom:4.8, units:{tank:1, infantry:3, fighter:2, navy:2} },
       India: { name:"India", ownerColor:powerColors.India, textColor:"#111827", faction:"Allies", gpt:9, lon:78.9, lat:22.5, zoom:5.0, units:{tank:1, infantry:5, fighter:1, navy:1} },
       Brazil: { name:"Brazil", ownerColor:powerColors.MinorAllies, textColor:"#fff", faction:"Allies", gpt:7, lon:-51.9, lat:-14.2, zoom:4.7, units:{tank:1, infantry:3, fighter:1, navy:1} },
@@ -2424,10 +2583,14 @@
 
     const IPC_BADGE_WHITELIST = new Set([
       "Germany", "Italy", "Japan",
-      "United States", "United States of America",
-      "United Kingdom", "Russia", "China",
+      "West USA", "East USA",
+      "United Kingdom", "China",
+      "West Russia", "East Russia", "Central Russia", "Siberia", "Far East Russia",
       "Ukraine", "Belarus", "Crimea", "Latvia",
-      "India", "Egypt", "Australia", "Canada",
+      "India", "Egypt", "Australia",
+      "British Columbia", "Yukon", "Northwest Territories",
+      "Alberta", "Saskatchewan", "Manitoba", "Ontario", "Quebec",
+      "Newfoundland",
       "France", "Brazil", "Mexico", "South Africa",
       "Hungary", "Romania", "Finland",
       "Spain", "Portugal", "Sweden", "Switzerland", "Turkey", "Ireland"
@@ -2459,15 +2622,34 @@
       Germany: { units:{tank:4, infantry:8, fighter:4, navy:5}, zoom:5.8 },
       Italy: { units:{tank:1, infantry:5, fighter:2, navy:4}, zoom:5.9 },
       Japan: { units:{tank:3, infantry:8, fighter:4, navy:8}, zoom:5.9 },
-      USA: { units:{tank:2, infantry:4, fighter:3, navy:7}, zoom:4.9 },
-      USSR: { units:{tank:2, infantry:10, fighter:2, navy:1}, zoom:4.9 },
+      USA: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.9 },
+      "West USA": { units:{tank:1, infantry:2, fighter:1, navy:4}, zoom:5.2 },
+      "East USA": { units:{tank:1, infantry:2, fighter:2, navy:3}, zoom:5.2 },
+      USSR: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.9 },
+      "West Russia": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.7 },
+      "East Russia": { units:{tank:2, infantry:10, fighter:2, navy:1}, zoom:5.6 },
+      "Central Russia": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.9 },
+      Siberia: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.4 },
+      "Far East Russia": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.2 },
       Ukraine: { units:{tank:1, infantry:3, fighter:1, navy:0}, zoom:6.1 },
       Belarus: { units:{tank:1, infantry:2, fighter:0, navy:0}, zoom:6.0 },
       Crimea: { units:{tank:1, infantry:1, fighter:0, navy:0}, zoom:6.5 },
       Latvia: { units:{tank:1, infantry:3, fighter:1, navy:0}, zoom:6.4 },
       UK: { units:{tank:2, infantry:6, fighter:3, navy:6}, zoom:5.8 },
       China: { units:{tank:0, infantry:6, fighter:1, navy:0}, zoom:5.1 },
-      Canada: { units:{tank:1, infantry:2, fighter:1, navy:1}, zoom:5.0 },
+      Canada: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.0 },
+      "British Columbia": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.5 },
+      Yukon: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.2 },
+      "Northwest Territories": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:4.8 },
+      Alberta: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.7 },
+      Saskatchewan: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.7 },
+      Manitoba: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:5.7 },
+      Ontario: { units:{tank:1, infantry:2, fighter:1, navy:0}, zoom:5.7 },
+      Quebec: { units:{tank:1, infantry:2, fighter:1, navy:1}, zoom:5.6 },
+      "New Brunswick": { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:6.6 },
+      "Nova Scotia": { units:{tank:0, infantry:1, fighter:0, navy:1}, zoom:6.6 },
+      PEI: { units:{tank:0, infantry:1, fighter:0, navy:0}, zoom:7.0 },
+      Newfoundland: { units:{tank:0, infantry:0, fighter:0, navy:0}, zoom:6.3 },
       Australia: { units:{tank:0, infantry:2, fighter:1, navy:1}, zoom:5.0 },
       India: { units:{tank:1, infantry:3, fighter:1, navy:1}, zoom:5.2 },
       Egypt: { units:{tank:1, infantry:2, fighter:0, navy:2}, zoom:5.9 },
@@ -2496,62 +2678,130 @@
         if (o.zoom) m.zoom = o.zoom;
       }
     });
+    powerMarkers.forEach((country) => initializeForceGroupsForCountry(country));
+
+    function boxRing(west, south, east, north) {
+      return [[west, south], [east, south], [east, north], [west, north], [west, south]];
+    }
+
+    function customTerritory(name, ring, options = {}) {
+      return {
+        type: "Feature",
+        properties: { name, customTerritory: true, ...options },
+        geometry: { type: "Polygon", coordinates: [ring] }
+      };
+    }
+
+    function clippedTerritory(name, bounds, clipToCountries, options = {}) {
+      return {
+        type: "Feature",
+        properties: {
+          name,
+          customTerritory: true,
+          clipBounds: bounds,
+          clipToCountries,
+          ...options
+        },
+        geometry: { type: "Polygon", coordinates: [boxRing(...bounds)] }
+      };
+    }
 
     const customLandTerritories = [
-      {
-        type: "Feature",
-        properties: { name: "Latvia", customTerritory: true, boundaryOnly: true },
-        geometry: {
-          type: "Polygon",
-          coordinates: [[
-            [19.55, 54.28],
-            [20.42, 54.12],
-            [21.72, 54.20],
-            [22.95, 54.34],
-            [24.12, 54.72],
-            [25.72, 54.82],
-            [27.08, 55.30],
-            [28.38, 56.02],
-            [29.05, 57.00],
-            [29.28, 58.10],
-            [28.78, 59.05],
-            [27.66, 59.35],
-            [26.18, 59.60],
-            [24.72, 59.70],
-            [23.62, 59.38],
-            [23.10, 58.72],
-            [22.35, 58.22],
-            [21.65, 57.66],
-            [21.05, 56.92],
-            [21.35, 56.06],
-            [20.85, 55.28],
-            [19.95, 54.82],
-            [19.55, 54.28]
-          ]]
-        }
-      },
-      {
-        type: "Feature",
-        properties: { name: "Crimea", customTerritory: true },
-        geometry: {
-          type: "Polygon",
-          coordinates: [[
-            [32.35, 45.25],
-            [32.78, 45.55],
-            [33.58, 45.78],
-            [34.42, 45.62],
-            [35.28, 45.24],
-            [36.33, 45.32],
-            [36.63, 44.98],
-            [36.22, 44.63],
-            [35.35, 44.38],
-            [34.58, 44.48],
-            [33.72, 44.36],
-            [32.92, 44.58],
-            [32.35, 45.25]
-          ]]
-        }
-      }
+      clippedTerritory("West USA", [-125.0, 24.5, -98.0, 49.5], ["United States of America", "United States"], {
+        fillColor: "#69a96a", borderColor: powerColors.USA, innerBorderColor: "#d8ffd8"
+      }),
+      clippedTerritory("East USA", [-98.0, 24.5, -66.5, 49.5], ["United States of America", "United States"], {
+        fillColor: "#72b56f", borderColor: powerColors.USA, innerBorderColor: "#d8ffd8"
+      }),
+
+      clippedTerritory("British Columbia", [-141.0, 48.3, -120.0, 60.0], ["Canada"], {
+        fillColor: "#74b96f", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2"
+      }),
+      clippedTerritory("Yukon", [-141.0, 60.0, -124.0, 70.4], ["Canada"], {
+        fillColor: "#6fb56e", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2", drawSouthClipBorder: true
+      }),
+      clippedTerritory("Northwest Territories", [-124.0, 60.0, -52.0, 74.2], ["Canada"], {
+        fillColor: "#82bf7a", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2", drawSouthClipBorder: true
+      }),
+      clippedTerritory("Alberta", [-120.0, 49.0, -110.0, 60.0], ["Canada"], {
+        fillColor: "#7fbe78", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2"
+      }),
+      clippedTerritory("Saskatchewan", [-110.0, 49.0, -102.0, 60.0], ["Canada"], {
+        fillColor: "#70b96f", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2"
+      }),
+      clippedTerritory("Manitoba", [-102.0, 49.0, -95.0, 60.0], ["Canada"], {
+        fillColor: "#7cbd74", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2"
+      }),
+      clippedTerritory("Ontario", [-95.0, 41.5, -79.0, 56.8], ["Canada"], {
+        fillColor: "#72b96f", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2"
+      }),
+      clippedTerritory("Quebec", [-79.0, 45.0, -57.0, 60.0], ["Canada"], {
+        fillColor: "#80c079", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2"
+      }),
+      clippedTerritory("Newfoundland", [-60.5, 46.5, -52.0, 52.5], ["Canada"], {
+        fillColor: "#76b970", borderColor: powerColors.Canada, innerBorderColor: "#e2ffe2"
+      }),
+
+      clippedTerritory("West Russia", [19.5, 53.8, 33.0, 66.0], ["Russia", "Russian Federation"], {
+        fillColor: "#d08a3b", borderColor: powerColors.USSR, innerBorderColor: "#ffe0b5"
+      }),
+      clippedTerritory("East Russia", [33.0, 50.0, 55.0, 66.0], ["Russia", "Russian Federation"], {
+        fillColor: "#d69545", borderColor: powerColors.USSR, innerBorderColor: "#ffe0b5"
+      }),
+      clippedTerritory("Central Russia", [55.0, 50.0, 85.0, 70.0], ["Russia", "Russian Federation"], {
+        fillColor: "#cf8640", borderColor: powerColors.USSR, innerBorderColor: "#ffe0b5"
+      }),
+      clippedTerritory("Siberia", [85.0, 50.0, 125.0, 72.0], ["Russia", "Russian Federation"], {
+        fillColor: "#d08a3b", borderColor: powerColors.USSR, innerBorderColor: "#ffe0b5"
+      }),
+      clippedTerritory("Far East Russia", [125.0, 45.0, 180.0, 72.0], ["Russia", "Russian Federation"], {
+        fillColor: "#d69545", borderColor: powerColors.USSR, innerBorderColor: "#ffe0b5"
+      }),
+
+      customTerritory("Latvia", [
+        [19.55, 54.28],
+        [20.42, 54.12],
+        [21.72, 54.20],
+        [22.95, 54.34],
+        [24.12, 54.72],
+        [25.72, 54.82],
+        [27.08, 55.30],
+        [28.38, 56.02],
+        [29.05, 57.00],
+        [29.28, 58.10],
+        [28.78, 59.05],
+        [27.66, 59.35],
+        [26.18, 59.60],
+        [24.72, 59.70],
+        [23.62, 59.38],
+        [23.10, 58.72],
+        [22.35, 58.22],
+        [21.65, 57.66],
+        [21.05, 56.92],
+        [21.35, 56.06],
+        [20.85, 55.28],
+        [19.95, 54.82],
+        [19.55, 54.28]
+      ], {
+        fillColor: "#d08a3b", borderColor: powerColors.USSR, innerBorderColor: "#ffe0b5"
+      }),
+      customTerritory("Crimea", [
+        [32.35, 45.25],
+        [32.78, 45.55],
+        [33.58, 45.78],
+        [34.42, 45.62],
+        [35.28, 45.24],
+        [36.33, 45.32],
+        [36.63, 44.98],
+        [36.22, 44.63],
+        [35.35, 44.38],
+        [34.58, 44.48],
+        [33.72, 44.36],
+        [32.92, 44.58],
+        [32.35, 45.25]
+      ], {
+        fillColor: "#d08a3b", borderColor: powerColors.USSR, innerBorderColor: "#ffe0b5"
+      })
     ];
 
     const navalZones = [
@@ -2884,10 +3134,12 @@
 
       const decoratedCustomLandTerritories = customLandTerritories.map((feature) => {
         const customFeature = JSON.parse(JSON.stringify(feature));
+        customFeature.geometry = clippedGeometryForCustomTerritory(customFeature, geojson.features);
         decorateFeature(customFeature);
         return customFeature;
       });
       geojson.features.push(...decoratedCustomLandTerritories);
+      registerLandZoneFeatures(geojson.features);
 
       map.addSource("countries", {
         type: "geojson",
@@ -2898,6 +3150,7 @@
         id: "country-fills",
         type: "fill",
         source: "countries",
+        filter: ["!=", ["get", "customTerritory"], true],
         paint: {
           "fill-color": ["get", "strengthColor"],
           "fill-opacity": [
@@ -2921,6 +3174,8 @@
         type: "line",
         source: "countries",
         filter: ["all",
+          ["!=", ["get", "customTerritory"], true],
+          ["!=", ["get", "name"], "Russia"],
           ["!=", ["get", "name"], "Estonia"],
           ["!=", ["get", "name"], "Latvia"],
           ["!=", ["get", "name"], "Lithuania"]
@@ -2965,6 +3220,8 @@
         type: "line",
         source: "countries",
         filter: ["all",
+          ["!=", ["get", "customTerritory"], true],
+          ["!=", ["get", "name"], "Russia"],
           ["==", ["get", "majorPower"], true],
           ["!=", ["get", "name"], "Estonia"],
           ["!=", ["get", "name"], "Latvia"],
@@ -3011,7 +3268,11 @@
         type: "fill",
         source: "custom-land-territories",
         paint: {
-          "fill-color": ["get", "politicalColor"],
+          "fill-color": [
+            "case",
+            ["has", "fillColor"], ["get", "fillColor"],
+            ["get", "politicalColor"]
+          ],
           "fill-opacity": [
             "interpolate",
             ["linear"],
@@ -3033,7 +3294,6 @@
         type: "line",
         source: "countries",
         filter: ["any",
-          ["==", ["get", "name"], "Russia"],
           ["==", ["get", "name"], "Ukraine"],
           ["==", ["get", "name"], "Belarus"],
           ["==", ["get", "name"], "Crimea"]
@@ -3070,7 +3330,6 @@
         type: "line",
         source: "countries",
         filter: ["any",
-          ["==", ["get", "name"], "Russia"],
           ["==", ["get", "name"], "Ukraine"],
           ["==", ["get", "name"], "Belarus"],
           ["==", ["get", "name"], "Crimea"]
@@ -3102,14 +3361,9 @@
         }
       });
 
-      const customBoundaryFeatures = customLandTerritories.map((feature) => ({
-        type: "Feature",
-        properties: { name: feature.properties.name },
-        geometry: {
-          type: "LineString",
-          coordinates: feature.geometry.coordinates[0]
-        }
-      }));
+      const customBoundaryFeatures = decoratedCustomLandTerritories.flatMap((feature) =>
+        boundaryFeaturesForCustomTerritory(feature)
+      );
 
       map.addSource("custom-territory-boundaries", {
         type: "geojson",
@@ -3125,7 +3379,7 @@
           "line-join": "round"
         },
         paint: {
-          "line-color": powerColors.USSR,
+          "line-color": ["get", "borderColor"],
           "line-width": ["interpolate", ["linear"], ["zoom"], 0, 4.0, 6, 9.0, 9, 12.0],
           "line-opacity": 0.95
         }
@@ -3140,7 +3394,7 @@
           "line-join": "round"
         },
         paint: {
-          "line-color": "#ffe0b5",
+          "line-color": ["get", "innerBorderColor"],
           "line-width": ["interpolate", ["linear"], ["zoom"], 0, 2.0, 6, 4.8, 9, 6.2],
           "line-opacity": 1
         }
@@ -3225,6 +3479,14 @@
       });
     }
 
+    function registerLandZoneFeatures(features) {
+      landZoneFeatures = features.filter((feature) => feature?.geometry && feature.properties?.name);
+      landZoneFeatureByName.clear();
+      landZoneFeatures.forEach((feature) => {
+        landZoneFeatureByName.set(feature.properties.name, feature);
+      });
+    }
+
 
     function addSeaZones() {
       const seaZones = {
@@ -3250,7 +3512,7 @@
 
       map.addSource("sea-zones", { type: "geojson", data: seaZones });
       map.addLayer({ id:"sea-zone-fills", type:"fill", source:"sea-zones", paint:{ "fill-color":"#7dd3fc", "fill-opacity":["interpolate", ["linear"], ["zoom"], 0,.06,3,.11,6,.08] } }, "country-fills");
-      map.addLayer({ id:"sea-zone-borders", type:"line", source:"sea-zones", paint:{ "line-color":"rgba(220,245,255,.98)", "line-width":["interpolate", ["linear"], ["zoom"], 0,1.8,4,3.0,7,4.2], "line-dasharray":[2,1.4], "line-opacity":["interpolate", ["linear"], ["zoom"], 0,.56,4,.96] } });
+      map.addLayer({ id:"sea-zone-borders", type:"line", source:"sea-zones", paint:{ "line-color":"rgba(220,245,255,.98)", "line-width":["interpolate", ["linear"], ["zoom"], 0,1.8,4,3.0,7,4.2], "line-opacity":0 } });
       map.addLayer({ id:"sea-zone-labels", type:"symbol", source:"sea-zones", minzoom:1.4, layout:{ "text-field":["get","name"], "text-font":["Open Sans Bold", "Arial Unicode MS Bold"], "text-size":["interpolate", ["linear"], ["zoom"], 1.4,10,5,15], "text-transform":"uppercase", "text-letter-spacing":.06, "text-allow-overlap":false }, paint:{ "text-color":"#f1fbff", "text-halo-color":"rgba(2,7,17,.92)", "text-halo-width":2 } });
 
       const seaZoneCountFeatures = seaZones.features.map((f) => ({ type:"Feature", geometry:{ type:"Point", coordinates: featureCenter(f)}, properties:{ count:String(f.properties.count || 0), badgeColor:"#d58c45", textColor:"#ffffff" } }));
@@ -3390,11 +3652,11 @@
     }
 
     function mobileLandOwnerForFeature(name) {
+      if (!MOBILE_LAND_POWERS.size) return null;
       const participant = participants[name];
       if (participant && MOBILE_LAND_POWERS.has(participant.name)) return participant.name;
-      // The USSR mobile marker follows only the Russia border; nearby Soviet territories keep their own stacks.
-      if (name === "Russia" || name === "Russian Federation") return "USSR";
-      if (name === "United States" || name === "United States of America") return "USA";
+      if (MOBILE_LAND_POWERS.has("USSR") && (name === "Russia" || name === "Russian Federation")) return "USSR";
+      if (MOBILE_LAND_POWERS.has("USA") && (name === "United States" || name === "United States of America")) return "USA";
       return null;
     }
 
@@ -3659,68 +3921,821 @@
         .join("");
     }
 
+    function geometryPolygonGroups(geometry) {
+      if (!geometry) return [];
+      if (geometry.type === "Polygon") return [geometry.coordinates];
+      if (geometry.type === "MultiPolygon") return geometry.coordinates;
+      return [];
+    }
+
+    function featureName(feature) {
+      const props = feature.properties || {};
+      return props.name || props.NAME || props.admin || "";
+    }
+
+    function clipRingToBounds(ring, bounds) {
+      const [west, south, east, north] = bounds;
+      const edges = [
+        { axis: "x", value: west, keep: (point) => point[0] >= west },
+        { axis: "x", value: east, keep: (point) => point[0] <= east },
+        { axis: "y", value: south, keep: (point) => point[1] >= south },
+        { axis: "y", value: north, keep: (point) => point[1] <= north }
+      ];
+
+      let output = ring.map((point) => [point[0], point[1]]);
+
+      edges.forEach((edge) => {
+        const input = output;
+        output = [];
+        if (!input.length) return;
+
+        let previous = input[input.length - 1];
+        let previousInside = edge.keep(previous);
+
+        input.forEach((current) => {
+          const currentInside = edge.keep(current);
+          if (currentInside !== previousInside) {
+            output.push(intersectionForClipEdge(previous, current, edge));
+          }
+          if (currentInside) {
+            output.push(current);
+          }
+          previous = current;
+          previousInside = currentInside;
+        });
+      });
+
+      const unique = output.filter((point, index) => {
+        const prev = output[index - 1];
+        return !prev || Math.abs(point[0] - prev[0]) > 1e-6 || Math.abs(point[1] - prev[1]) > 1e-6;
+      });
+
+      if (unique.length < 3) return null;
+      const first = unique[0];
+      const last = unique[unique.length - 1];
+      if (Math.abs(first[0] - last[0]) > 1e-6 || Math.abs(first[1] - last[1]) > 1e-6) {
+        unique.push([first[0], first[1]]);
+      }
+
+      return unique.length >= 4 ? unique : null;
+    }
+
+    function intersectionForClipEdge(a, b, edge) {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      if (edge.axis === "x") {
+        const t = dx === 0 ? 0 : (edge.value - a[0]) / dx;
+        return [edge.value, a[1] + dy * t];
+      }
+
+      const t = dy === 0 ? 0 : (edge.value - a[1]) / dy;
+      return [a[0] + dx * t, edge.value];
+    }
+
+    function clippedGeometryForFeature(feature, bounds) {
+      const polygons = [];
+      geometryPolygonGroups(feature.geometry).forEach((rings) => {
+        const clippedOuter = clipRingToBounds(rings[0] || [], bounds);
+        if (clippedOuter) polygons.push([clippedOuter]);
+      });
+
+      if (!polygons.length) return null;
+      if (polygons.length === 1) {
+        return { type: "Polygon", coordinates: polygons[0] };
+      }
+      return { type: "MultiPolygon", coordinates: polygons };
+    }
+
+    function clippedGeometryForCustomTerritory(feature, countryFeatures) {
+      const names = feature.properties?.clipToCountries;
+      const bounds = feature.properties?.clipBounds;
+      if (!Array.isArray(names) || !Array.isArray(bounds)) return feature.geometry;
+
+      const polygons = [];
+      countryFeatures
+        .filter((countryFeature) => names.includes(featureName(countryFeature)))
+        .forEach((countryFeature) => {
+          const clipped = clippedGeometryForFeature(countryFeature, bounds);
+          geometryPolygonGroups(clipped).forEach((rings) => polygons.push(rings));
+        });
+
+      if (!polygons.length) return feature.geometry;
+      if (polygons.length === 1) {
+        return { type: "Polygon", coordinates: polygons[0] };
+      }
+      return { type: "MultiPolygon", coordinates: polygons };
+    }
+
+    function boundaryFeaturesForCustomTerritory(feature) {
+      const props = feature.properties || {};
+      const boundaryProps = {
+        name: props.name,
+        borderColor: props.borderColor || props.ownerColor || "#ffffff",
+        innerBorderColor: props.innerBorderColor || "#ffffff"
+      };
+      const features = [];
+
+      geometryPolygonGroups(feature.geometry).forEach((rings) => {
+        const ring = rings[0] || [];
+        let line = [];
+
+        const flushLine = () => {
+          if (line.length >= 2) {
+            features.push({
+              type: "Feature",
+              properties: boundaryProps,
+              geometry: { type: "LineString", coordinates: line }
+            });
+          }
+          line = [];
+        };
+
+        for (let i = 1; i < ring.length; i++) {
+          const a = ring[i - 1];
+          const b = ring[i];
+
+          if (isHiddenClipSegment(a, b, props)) {
+            flushLine();
+            continue;
+          }
+
+          if (!line.length) line.push(a);
+          line.push(b);
+        }
+
+        flushLine();
+      });
+
+      return features;
+    }
+
+    function isHiddenClipSegment(a, b, props) {
+      const bounds = props?.clipBounds;
+      if (!Array.isArray(bounds)) return false;
+      const [, south, , north] = bounds;
+      const eps = 1e-5;
+      const onSouth = Math.abs(a[1] - south) < eps && Math.abs(b[1] - south) < eps;
+      const onNorth = Math.abs(a[1] - north) < eps && Math.abs(b[1] - north) < eps;
+      return (onSouth && !props.drawSouthClipBorder) || (onNorth && !props.drawNorthClipBorder);
+    }
+
     function createPieceMarkers() {
       countryMarkers.forEach((ref) => ref.marker?.remove?.());
       countryMarkers = [];
 
       powerMarkers.forEach((country) => {
-        const units = country.units || {};
-        if (!(units.tank || units.infantry || units.fighter || units.navy)) return;
+        initializeForceGroupsForCountry(country);
+        const groups = orderedForceGroupsForCountry(country);
+        if (!groups.length) return;
 
-        const el = document.createElement("div");
-        el.className = "pieceMarker singlePiece";
-        el.dataset.country = country.name;
-        el.innerHTML = markerHtml(country);
+        groups.forEach((force, groupIndex) => {
+          const units = force.units || {};
+          const point = forceGroupCoordinateForCountry(country, groupIndex, groups.length);
+          const el = document.createElement("div");
+          el.className = `pieceMarker singlePiece ${forceGroupLayoutClass(country, force, groupIndex, groups.length)}`;
+          el.dataset.country = country.name;
+          el.dataset.force = force.ownerName;
+          el.innerHTML = markerHtml(country, force);
 
-        el.addEventListener("click", (event) => {
-          event.stopPropagation();
-          selectedPowerName = country.name;
-          setSelected(
-            `${country.name} · ${country.faction} · GDP ${country.gpt} · ` +
-            `Tanks ${units.tank || 0}, Infantry ${units.infantry || 0}, Fighters ${units.fighter || 0}, Navy ${units.navy || 0}`
-          );
-        });
+          el.addEventListener("click", (event) => {
+            event.stopPropagation();
+            selectedPowerName = country.name;
+            setSelected(
+              `${force.ownerName} in ${country.name} · ${country.faction} · GDP ${country.gpt} · ` +
+              `Tanks ${units.tank || 0}, Infantry ${units.infantry || 0}, Fighters ${units.fighter || 0}, Navy ${units.navy || 0}`
+            );
+          });
 
-        const marker = new maplibregl.Marker({
-          element: el,
-          anchor: "center",
-          occludedOpacity: 0
-        })
-          .setLngLat([country.lon, country.lat])
-          .addTo(map);
+          const marker = new maplibregl.Marker({
+            element: el,
+            anchor: "center",
+            occludedOpacity: 0
+          })
+            .setLngLat(point)
+            .addTo(map);
 
-        countryMarkers.push({
-          marker,
-          country,
-          element: el,
-          lon: country.lon,
-          lat: country.lat
+          const ref = {
+            marker,
+            country,
+            force,
+            element: el,
+            lon: point[0],
+            lat: point[1]
+          };
+
+          countryMarkers.push(ref);
+          bindLandStackInteractions(ref);
         });
       });
     }
 
-    function markerHtml(country) {
-      const units = country.units || {};
+    function markerHtml(country, force) {
+      const units = force.units || {};
       return `
         <div class="unitCluster">
-          ${unitStackHtml("tank", units.tank || 0, country.ownerColor)}
-          ${unitStackHtml("infantry", units.infantry || 0, country.ownerColor)}
-          ${unitStackHtml("fighter", units.fighter || 0, country.ownerColor)}
-          ${unitStackHtml("navy", units.navy || 0, country.ownerColor)}
-          <div class="markerName">${country.label} · GDP ${country.gpt}</div>
+          ${unitStackHtml("tank", units.tank || 0, force.ownerColor, force)}
+          ${unitStackHtml("infantry", units.infantry || 0, force.ownerColor, force)}
+          ${unitStackHtml("fighter", units.fighter || 0, force.ownerColor, force)}
+          ${unitStackHtml("navy", units.navy || 0, force.ownerColor, force)}
+          <div class="markerName">${forceLabelForZone(country, force)}</div>
         </div>
       `;
     }
 
-    function unitStackHtml(type, count, ownerColor) {
+    function unitStackHtml(type, count, ownerColor, force = null) {
       if (!count) return "";
+      const moveEnabled = type !== "navy";
       return `
-        <div class="unitStack ${type}">
+        <div class="unitStack ${type}" data-unit="${type}" data-count="${count}" title="${moveEnabled ? "Move stack" : "Sea units move later"}">
           ${stackChipsHtml(count)}
           ${iconSvg(type, ownerColor || "#111827")}
           <div class="count">${count}</div>
+          ${isUndoTarget(force, type) ? undoButtonHtml() : ""}
         </div>
       `;
+    }
+
+    function undoButtonHtml() {
+      return `
+        <button class="unitUndoBtn" type="button" data-move-undo="true" title="Undo last move" aria-label="Undo last move">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 8H4V3"/>
+            <path d="M4.5 8.5A8 8 0 1 1 6 18"/>
+          </svg>
+        </button>
+      `;
+    }
+
+    function isUndoTarget(force, type) {
+      if (!force || !lastLandMove) return false;
+      return lastLandMove.type === type && lastLandMove.toForceId === force.id;
+    }
+
+    function initializeForceGroupsForCountry(country) {
+      if (Array.isArray(country.forceGroups)) {
+        syncCountryUnitsFromGroups(country);
+        return country.forceGroups;
+      }
+
+      const units = normalizeUnitCounts(country.units);
+      country.forceGroups = hasAnyUnits(units)
+        ? [createForceGroup(country, country, units)]
+        : [];
+      syncCountryUnitsFromGroups(country);
+      return country.forceGroups;
+    }
+
+    function createForceGroup(zoneCountry, owner, units = null) {
+      const ownerName = owner.ownerName || owner.name || zoneCountry.name;
+      const ownerKey = owner.ownerKey || owner.countryKey || ownerName;
+      return {
+        id: `fg-${forceGroupIdCounter++}`,
+        ownerKey,
+        ownerName,
+        ownerColor: owner.ownerColor || zoneCountry.ownerColor || "#111827",
+        textColor: owner.textColor || zoneCountry.textColor || "#fff",
+        faction: owner.faction || zoneCountry.faction,
+        units: normalizeUnitCounts(units || {})
+      };
+    }
+
+    function normalizeUnitCounts(units = {}) {
+      return Object.fromEntries(LAND_UNIT_TYPES.map((type) => [
+        type,
+        Math.max(0, Number(units[type] || 0))
+      ]));
+    }
+
+    function hasAnyUnits(units = {}) {
+      return LAND_UNIT_TYPES.some((type) => Number(units[type] || 0) > 0);
+    }
+
+    function activeForceGroups(country) {
+      initializeForceGroupsForCountry(country);
+      return country.forceGroups.filter((force) => hasAnyUnits(force.units));
+    }
+
+    function orderedForceGroupsForCountry(country) {
+      return activeForceGroups(country).slice().sort((a, b) => {
+        const aHome = isHomeForce(country, a) ? 0 : 1;
+        const bHome = isHomeForce(country, b) ? 0 : 1;
+        if (aHome !== bHome) return aHome - bHome;
+        return String(a.ownerName).localeCompare(String(b.ownerName));
+      });
+    }
+
+    function syncCountryUnitsFromGroups(country) {
+      const aggregate = normalizeUnitCounts();
+      if (Array.isArray(country.forceGroups)) {
+        country.forceGroups = country.forceGroups.filter((force) => hasAnyUnits(force.units));
+        country.forceGroups.forEach((force) => {
+          force.units = normalizeUnitCounts(force.units);
+          LAND_UNIT_TYPES.forEach((type) => {
+            aggregate[type] += force.units[type];
+          });
+        });
+      }
+      country.units = aggregate;
+      return aggregate;
+    }
+
+    function findMatchingForceGroup(country, sourceForce) {
+      initializeForceGroupsForCountry(country);
+      return country.forceGroups.find((force) =>
+        force.ownerColor === sourceForce.ownerColor ||
+        force.ownerKey === sourceForce.ownerKey ||
+        force.ownerName === sourceForce.ownerName
+      ) || null;
+    }
+
+    function findOrCreateMatchingForceGroup(country, sourceForce) {
+      const existing = findMatchingForceGroup(country, sourceForce);
+      if (existing) return existing;
+
+      const created = createForceGroup(country, sourceForce);
+      country.forceGroups.push(created);
+      return created;
+    }
+
+    function forceGroupCoordinateForCountry(country, groupIndex, groupCount) {
+      if (groupCount <= 1) return [country.lon, country.lat];
+
+      const offsets = [
+        [-1.18, -0.08],
+        [1.18, 0.12],
+        [-0.20, 1.03],
+        [0.24, -1.03],
+        [-1.35, 0.86],
+        [1.35, -0.86]
+      ];
+      const [x, y] = offsets[groupIndex % offsets.length];
+      const spread = multiForceSpreadForCountry(country);
+      return [country.lon + x * spread, country.lat + y * spread];
+    }
+
+    function multiForceSpreadForCountry(country) {
+      if (country.name === "Poland") return 1.75;
+      if (country.gpt >= 12) return 1.95;
+      if (country.gpt >= 6) return 1.65;
+      return 1.45;
+    }
+
+    function forceGroupLayoutClass(country, force, groupIndex, groupCount) {
+      if (groupCount <= 1) return "forceGroup-center";
+      if (isHomeForce(country, force) || groupIndex === 0) return "forceGroup-left";
+      if (groupIndex === 1) return "forceGroup-right";
+      if (groupIndex === 2) return "forceGroup-top";
+      if (groupIndex === 3) return "forceGroup-bottom";
+      return groupIndex % 2 ? "forceGroup-right" : "forceGroup-left";
+    }
+
+    function isHomeForce(country, force) {
+      return force.ownerName === country.name || force.ownerKey === country.countryKey;
+    }
+
+    function forceLabelForZone(country, force) {
+      const sameOwner = force.ownerName === country.name || force.ownerKey === country.countryKey;
+      if (sameOwner) return `${country.label} · GDP ${country.gpt}`;
+      return `${force.ownerName} in ${country.label}`;
+    }
+
+    function bindLandStackInteractions(ref) {
+      ref.element.querySelectorAll(".unitStack[data-unit]").forEach((stack) => {
+        const type = stack.dataset.unit;
+        if (!LAND_MOVE_UNIT_TYPES.has(type)) return;
+
+        stack.addEventListener("pointerdown", (event) => {
+          if (event.target.closest("[data-move-undo]")) return;
+          event.preventDefault();
+          event.stopPropagation();
+
+          const count = Math.max(0, Number(ref.force.units?.[type] || 0));
+          if (!count) return;
+
+          if (count > 1) {
+            showMoveQuantityPicker(ref, type, count, event);
+            return;
+          }
+
+          beginLandDrag(ref, type, 1, event);
+        });
+
+        stack.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+      });
+
+      ref.element.querySelectorAll("[data-move-undo]").forEach((button) => {
+        button.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        });
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          undoLastLandMove();
+        });
+      });
+    }
+
+    function showMoveQuantityPicker(ref, type, count, event) {
+      hideMoveQuantityPicker();
+
+      pendingLandMove = { ref, type, sourceEl: event.currentTarget };
+      pendingLandMove.sourceEl.classList.add("moveSource");
+
+      const picker = document.createElement("div");
+      picker.className = "moveQuantityPicker";
+      picker.setAttribute("role", "menu");
+
+      for (let qty = count; qty >= 1; qty--) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = String(qty);
+        button.dataset.quantity = String(qty);
+        button.title = `Move ${qty}`;
+        button.addEventListener("pointerdown", (choiceEvent) => {
+          choiceEvent.preventDefault();
+          choiceEvent.stopPropagation();
+          beginLandDrag(ref, type, qty, choiceEvent);
+        });
+        picker.appendChild(button);
+      }
+
+      document.body.appendChild(picker);
+      const x = Math.min(window.innerWidth - 58, Math.max(10, event.clientX + 18));
+      const maxHeight = Math.min(208, count * 36 + 14);
+      const y = Math.min(window.innerHeight - maxHeight - 10, Math.max(10, event.clientY - maxHeight / 2));
+      picker.style.left = `${x}px`;
+      picker.style.top = `${y}px`;
+
+      statusPill.textContent = `${ref.force.ownerName} in ${ref.country.name} · ${unitLabel(type)} · choose quantity`;
+    }
+
+    function hideMoveQuantityPicker() {
+      document.querySelectorAll(".moveQuantityPicker").forEach((picker) => picker.remove());
+      if (pendingLandMove?.sourceEl) {
+        pendingLandMove.sourceEl.classList.remove("moveSource");
+      }
+      pendingLandMove = null;
+    }
+
+    function beginLandDrag(ref, type, quantity, event) {
+      const available = Math.max(0, Number(ref.force.units?.[type] || 0));
+      const moveQuantity = Math.max(1, Math.min(quantity, available));
+      if (!moveQuantity) return;
+
+      hideMoveQuantityPicker();
+
+      const sourceZoneName = zoneNameForCountry(ref.country);
+      const ghost = document.createElement("div");
+      ghost.className = "moveGhost pieceMarker singlePiece invalid";
+      ghost.innerHTML = unitStackHtml(type, moveQuantity, ref.force.ownerColor, null);
+      document.body.appendChild(ghost);
+
+      activeLandMove = {
+        ref,
+        type,
+        quantity: moveQuantity,
+        sourceCountry: ref.country,
+        sourceForce: ref.force,
+        sourceZoneName,
+        ghost,
+        dropZoneName: null,
+        valid: false
+      };
+
+      ref.element.querySelector(`.unitStack.${type}`)?.classList.add("moveSource");
+
+      if (map.dragPan?.disable) map.dragPan.disable();
+      window.addEventListener("pointermove", updateLandDrag);
+      window.addEventListener("pointerup", finishLandDrag);
+      window.addEventListener("pointercancel", cancelLandDrag);
+
+      updateLandDrag(event);
+    }
+
+    function updateLandDrag(event) {
+      if (!activeLandMove) return;
+      event.preventDefault();
+
+      const ghost = activeLandMove.ghost;
+      ghost.style.transform = `translate3d(${event.clientX - 31}px, ${event.clientY - 31}px, 0)`;
+
+      const dropZone = landZoneAtClientPoint(event.clientX, event.clientY);
+      activeLandMove.dropZoneName = dropZone?.name || null;
+      activeLandMove.valid = !!dropZone && isValidLandMove(activeLandMove, dropZone.name);
+      ghost.classList.toggle("valid", activeLandMove.valid);
+      ghost.classList.toggle("invalid", !activeLandMove.valid);
+
+      if (statusPill) {
+        statusPill.textContent = activeLandMove.valid
+          ? `Drop in ${dropZone.name}`
+          : "Adjacent land zone only";
+      }
+    }
+
+    function finishLandDrag(event) {
+      if (!activeLandMove) return;
+      event.preventDefault();
+      const move = activeLandMove;
+      const wasValid = move.valid && move.dropZoneName;
+      cleanupLandDrag();
+
+      if (wasValid) {
+        applyLandMove(move, move.dropZoneName);
+        return;
+      }
+
+      if (statusPill) statusPill.textContent = "Move cancelled";
+    }
+
+    function cancelLandDrag() {
+      cleanupLandDrag();
+      if (statusPill) statusPill.textContent = "Move cancelled";
+    }
+
+    function cleanupLandDrag() {
+      if (!activeLandMove) {
+        hideMoveQuantityPicker();
+        return;
+      }
+
+      activeLandMove.ghost?.remove();
+      activeLandMove.ref?.element
+        ?.querySelector(`.unitStack.${activeLandMove.type}`)
+        ?.classList.remove("moveSource");
+      activeLandMove = null;
+      hideMoveQuantityPicker();
+
+      window.removeEventListener("pointermove", updateLandDrag);
+      window.removeEventListener("pointerup", finishLandDrag);
+      window.removeEventListener("pointercancel", cancelLandDrag);
+      if (map.dragPan?.enable) map.dragPan.enable();
+    }
+
+    function landZoneAtClientPoint(clientX, clientY) {
+      const canvas = map.getCanvas();
+      const rect = canvas.getBoundingClientRect();
+      const point = [clientX - rect.left, clientY - rect.top];
+      const layers = ["custom-land-fills", "country-fills"].filter((layer) => map.getLayer(layer));
+
+      for (const layer of layers) {
+        const feature = map.queryRenderedFeatures(point, { layers: [layer] })
+          .find((item) => findCountryForZoneName(item.properties?.name));
+        if (feature?.properties?.name) {
+          return { name: feature.properties.name, feature };
+        }
+      }
+
+      return null;
+    }
+
+    function isValidLandMove(move, targetZoneName) {
+      const targetCountry = findCountryForZoneName(targetZoneName);
+      if (!targetCountry || !move.sourceZoneName) return false;
+
+      const destinationZoneName = zoneNameForCountry(targetCountry) || targetZoneName;
+      if (destinationZoneName === move.sourceZoneName) return false;
+
+      return areAdjacentLandZones(move.sourceZoneName, destinationZoneName);
+    }
+
+    function applyLandMove(move, targetZoneName) {
+      const source = move.sourceCountry;
+      const sourceForce = move.sourceForce;
+      const target = findCountryForZoneName(targetZoneName);
+      if (!source || !sourceForce || !target) return;
+
+      const destinationZoneName = zoneNameForCountry(target) || targetZoneName;
+      initializeForceGroupsForCountry(source);
+      initializeForceGroupsForCountry(target);
+      const targetForce = findOrCreateMatchingForceGroup(target, sourceForce);
+      const sourceUnits = ensureUnits(sourceForce);
+      const targetUnits = ensureUnits(targetForce);
+      const available = Math.max(0, Number(sourceUnits[move.type] || 0));
+      const quantity = Math.max(1, Math.min(move.quantity, available));
+      if (!quantity) return;
+
+      sourceUnits[move.type] = Math.max(0, available - quantity);
+      targetUnits[move.type] = Math.max(0, Number(targetUnits[move.type] || 0)) + quantity;
+      syncCountryUnitsFromGroups(source);
+      syncCountryUnitsFromGroups(target);
+
+      lastLandMove = {
+        type: move.type,
+        quantity,
+        fromCountryKey: source.countryKey,
+        fromCountryName: source.name,
+        fromZoneName: move.sourceZoneName,
+        fromForceId: sourceForce.id,
+        fromForce: forceSnapshot(sourceForce),
+        toCountryKey: target.countryKey,
+        toCountryName: target.name,
+        toZoneName: destinationZoneName,
+        toForceId: targetForce.id,
+        toForce: forceSnapshot(targetForce)
+      };
+
+      selectedPowerName = target.name;
+      refreshLandPieceMarkers();
+      setSelected(`${quantity} ${sourceForce.ownerName} ${unitLabel(move.type)} moved from ${source.name} to ${target.name}.`);
+      if (statusPill) statusPill.textContent = `Moved ${quantity} ${unitLabel(move.type)} to ${target.name}`;
+    }
+
+    function undoLastLandMove() {
+      if (!lastLandMove) return;
+
+      const move = lastLandMove;
+      const source = findCountryByIdentity(move.fromCountryKey, move.fromCountryName);
+      const target = findCountryByIdentity(move.toCountryKey, move.toCountryName);
+      if (!source || !target) return;
+
+      initializeForceGroupsForCountry(source);
+      initializeForceGroupsForCountry(target);
+      const targetForce = findForceGroupById(target, move.toForceId) || findMatchingForceGroup(target, move.toForce);
+      const sourceForce = findForceGroupById(source, move.fromForceId) || findOrCreateMatchingForceGroup(source, move.fromForce);
+      if (!sourceForce || !targetForce) return;
+
+      const sourceUnits = ensureUnits(sourceForce);
+      const targetUnits = ensureUnits(targetForce);
+      const available = Math.max(0, Number(targetUnits[move.type] || 0));
+      const quantity = Math.max(1, Math.min(move.quantity, available));
+      if (!quantity) return;
+
+      targetUnits[move.type] = Math.max(0, available - quantity);
+      sourceUnits[move.type] = Math.max(0, Number(sourceUnits[move.type] || 0)) + quantity;
+      syncCountryUnitsFromGroups(source);
+      syncCountryUnitsFromGroups(target);
+
+      lastLandMove = null;
+      selectedPowerName = source.name;
+      refreshLandPieceMarkers();
+      setSelected(`Undid ${quantity} ${move.fromForce.ownerName} ${unitLabel(move.type)} from ${target.name} to ${source.name}.`);
+      if (statusPill) statusPill.textContent = "Move undone";
+    }
+
+    function refreshLandPieceMarkers() {
+      createPieceMarkers();
+      updatePlacedCount();
+      syncPhysicalPieceZoomState();
+      updateUiState();
+    }
+
+    function ensureUnits(holder) {
+      if (!holder.units) holder.units = {};
+      LAND_UNIT_TYPES.forEach((type) => {
+        holder.units[type] = Math.max(0, Number(holder.units[type] || 0));
+      });
+      return holder.units;
+    }
+
+    function findForceGroupById(country, forceId) {
+      initializeForceGroupsForCountry(country);
+      return country.forceGroups.find((force) => force.id === forceId) || null;
+    }
+
+    function forceSnapshot(force) {
+      return {
+        id: force.id,
+        ownerKey: force.ownerKey,
+        ownerName: force.ownerName,
+        ownerColor: force.ownerColor,
+        textColor: force.textColor,
+        faction: force.faction
+      };
+    }
+
+    function findCountryForZoneName(zoneName) {
+      if (!zoneName) return null;
+      return powerMarkers.find((country) =>
+        country.name === zoneName ||
+        country.countryKey === zoneName ||
+        country.label === zoneName
+      ) || null;
+    }
+
+    function findCountryByIdentity(countryKey, countryName) {
+      return powerMarkers.find((country) =>
+        country.countryKey === countryKey ||
+        country.name === countryName
+      ) || null;
+    }
+
+    function zoneNameForCountry(country) {
+      if (!country) return null;
+      const candidates = [country.countryKey, country.name, country.label];
+      return candidates.find((name) => landZoneFeatureByName.has(name)) || null;
+    }
+
+    function unitLabel(type) {
+      if (type === "tank") return "tank";
+      if (type === "fighter") return "fighter";
+      if (type === "infantry") return "infantry";
+      return "piece";
+    }
+
+    function areAdjacentLandZones(sourceZoneName, destinationZoneName) {
+      if (!sourceZoneName || !destinationZoneName || sourceZoneName === destinationZoneName) return false;
+      const sourceFeature = landZoneFeatureByName.get(sourceZoneName);
+      const destinationFeature = landZoneFeatureByName.get(destinationZoneName);
+      if (!sourceFeature || !destinationFeature) return false;
+      return featuresShareBorder(sourceFeature, destinationFeature);
+    }
+
+    function featuresShareBorder(a, b) {
+      const tolerance = 0.18;
+      const aBounds = featureBounds(a);
+      const bBounds = featureBounds(b);
+      if (!boundsWithinTolerance(aBounds, bBounds, tolerance)) return false;
+
+      const aSegments = featureOuterSegments(a);
+      const bSegments = featureOuterSegments(b);
+      const toleranceSq = tolerance * tolerance;
+
+      for (const segA of aSegments) {
+        for (const segB of bSegments) {
+          if (segmentDistanceSq(segA[0], segA[1], segB[0], segB[1]) <= toleranceSq) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
+    function featureBounds(feature) {
+      const coords = [];
+      collectCoords(feature.geometry.coordinates, coords);
+      return coords.reduce((bounds, point) => ({
+        minX: Math.min(bounds.minX, point[0]),
+        minY: Math.min(bounds.minY, point[1]),
+        maxX: Math.max(bounds.maxX, point[0]),
+        maxY: Math.max(bounds.maxY, point[1])
+      }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+    }
+
+    function boundsWithinTolerance(a, b, tolerance) {
+      return !(
+        a.maxX < b.minX - tolerance ||
+        b.maxX < a.minX - tolerance ||
+        a.maxY < b.minY - tolerance ||
+        b.maxY < a.minY - tolerance
+      );
+    }
+
+    function featureOuterSegments(feature) {
+      const segments = [];
+      geometryPolygonGroups(feature.geometry).forEach((rings) => {
+        const ring = rings[0] || [];
+        for (let i = 1; i < ring.length; i++) {
+          segments.push([ring[i - 1], ring[i]]);
+        }
+      });
+      return segments;
+    }
+
+    function segmentDistanceSq(a, b, c, d) {
+      if (segmentsIntersect(a, b, c, d)) return 0;
+      return Math.min(
+        pointSegmentDistanceSq(a, c, d),
+        pointSegmentDistanceSq(b, c, d),
+        pointSegmentDistanceSq(c, a, b),
+        pointSegmentDistanceSq(d, a, b)
+      );
+    }
+
+    function pointSegmentDistanceSq(point, a, b) {
+      const lat = (point[1] + a[1] + b[1]) / 3;
+      const lonScale = Math.max(0.18, Math.cos(lat * Math.PI / 180));
+      const px = point[0] * lonScale;
+      const py = point[1];
+      const ax = a[0] * lonScale;
+      const ay = a[1];
+      const bx = b[0] * lonScale;
+      const by = b[1];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lenSq = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+      const x = ax + dx * t;
+      const y = ay + dy * t;
+      return (px - x) * (px - x) + (py - y) * (py - y);
+    }
+
+    function segmentsIntersect(a, b, c, d) {
+      const o1 = orientation(a, b, c);
+      const o2 = orientation(a, b, d);
+      const o3 = orientation(c, d, a);
+      const o4 = orientation(c, d, b);
+      return o1 * o2 < 0 && o3 * o4 < 0;
+    }
+
+    function orientation(a, b, c) {
+      const value = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      if (Math.abs(value) < 1e-9) return 0;
+      return value > 0 ? 1 : -1;
     }
 
     function stackChipsHtml(count) {
@@ -4132,7 +5147,13 @@
         map.setPaintProperty(
           "custom-land-fills",
           "fill-color",
-          colourMode === "strength" ? ["get", "strengthColor"] : ["get", "politicalColor"]
+          colourMode === "strength"
+            ? ["get", "strengthColor"]
+            : [
+                "case",
+                ["has", "fillColor"], ["get", "fillColor"],
+                ["get", "politicalColor"]
+              ]
         );
       }
       updateModeReadout();
@@ -4535,6 +5556,13 @@
     window.addEventListener("resize", () => {
       map.resize();
       updateUiState();
+    });
+
+    document.addEventListener("pointerdown", (event) => {
+      if (activeLandMove) return;
+      if (event.target.closest(".moveQuantityPicker")) return;
+      if (event.target.closest(".pieceMarker.singlePiece .unitStack")) return;
+      hideMoveQuantityPicker();
     });
   </script>
 </body>
